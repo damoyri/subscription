@@ -1,4 +1,4 @@
-﻿[{
+[{
   "dns": {
     "servers": [
       "8.8.8.8",
@@ -121,7 +121,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡·рџ‡є Р РѕСЃСЃРёСЏ | YouTube"
+  "remarks": "🇷🇺 Россия | YouTube"
 }, {
   "dns": {
     "servers": [
@@ -295,7 +295,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡Їрџ‡µ РЇРїРѕРЅРёСЏ"
+  "remarks": "🇯🇵 Япония"
 }, {
   "dns": {
     "servers": [
@@ -469,7 +469,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡©рџ‡Є Р“РµСЂРјР°РЅРёСЏ"
+  "remarks": "🇩🇪 Германия"
 }, {
   "dns": {
     "servers": [
@@ -643,7 +643,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡ёрџ‡Є РЁРІРµС†РёСЏ"
+  "remarks": "🇸🇪 Швеция"
 }, {
   "dns": {
     "servers": [
@@ -817,7 +817,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡¬рџ‡§ Р’РµР»РёРєРѕР±СЂРёС‚Р°РЅРёСЏ"
+  "remarks": "🇬🇧 Великобритания"
 }, {
   "dns": {
     "servers": [
@@ -990,7 +990,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡ірџ‡± РќРёРґРµСЂР»Р°РЅРґС‹ рџЋ®"
+  "remarks": "🇳🇱 Нидерланды 🎮"
 }, {
   "dns": {
     "servers": [
@@ -1164,7 +1164,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡ёрџ‡¬ РЎРёРЅРіР°РїСѓСЂ"
+  "remarks": "🇸🇬 Сингапур"
 }, {
   "dns": {
     "servers": [
@@ -1338,7 +1338,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡±рџ‡№ Р›РёС‚РІР°"
+  "remarks": "🇱🇹 Литва"
 }, {
   "dns": {
     "servers": [
@@ -1512,7 +1512,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡® Р¤РёРЅР»СЏРЅРґРёСЏ"
+  "remarks": "🇫🇮 Финляндия"
 }, {
   "dns": {
     "servers": [
@@ -1686,7 +1686,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡єрџ‡ё РЎРЁРђ"
+  "remarks": "🇺🇸 США"
 }, {
   "dns": {
     "servers": [
@@ -1860,7 +1860,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡µрџ‡± РџРѕР»СЊС€Р°"
+  "remarks": "🇵🇱 Польша"
 }, {
   "dns": {
     "servers": [
@@ -2034,7 +2034,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡Ёрџ‡­ РЁРІРµР№С†Р°СЂРёСЏ"
+  "remarks": "🇨🇭 Швейцария"
 }, {
   "dns": {
     "servers": [
@@ -2208,7 +2208,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡§рџ‡ѕ Р‘РµР»Р°СЂСѓСЃСЊ"
+  "remarks": "🇧🇾 Беларусь"
 }, {
   "dns": {
     "servers": [
@@ -3654,7 +3654,7 @@
       "bypass"
     ]
   },
-  "remarks": "рџ‡«рџ‡І РђР’РўРћ РћР‘РҐРћР”"
+  "remarks": "🇫🇲 АВТО ОБХОД"
 }, {
   "dns": {
     "servers": [
@@ -3778,7 +3778,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–0-1"
+  "remarks": "🇫🇲 ОБХОД №0-1"
 }, {
   "dns": {
     "servers": [
@@ -3902,7 +3902,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–0-2"
+  "remarks": "🇫🇲 ОБХОД №0-2"
 }, {
   "dns": {
     "servers": [
@@ -4026,7 +4026,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–1-1"
+  "remarks": "🇫🇲 ОБХОД №1-1"
 }, {
   "dns": {
     "servers": [
@@ -4150,7 +4150,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–1-2"
+  "remarks": "🇫🇲 ОБХОД №1-2"
 }, {
   "dns": {
     "servers": [
@@ -4274,7 +4274,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–2-1"
+  "remarks": "🇫🇲 ОБХОД №2-1"
 }, {
   "dns": {
     "servers": [
@@ -4398,7 +4398,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–2-2"
+  "remarks": "🇫🇲 ОБХОД №2-2"
 }, {
   "dns": {
     "servers": [
@@ -4522,7 +4522,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–3"
+  "remarks": "🇫🇲 ОБХОД №3"
 }, {
   "dns": {
     "servers": [
@@ -4646,7 +4646,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–4-1"
+  "remarks": "🇫🇲 ОБХОД №4-1"
 }, {
   "dns": {
     "servers": [
@@ -4770,7 +4770,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–4-2"
+  "remarks": "🇫🇲 ОБХОД №4-2"
 }, {
   "dns": {
     "servers": [
@@ -4894,7 +4894,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–4-3"
+  "remarks": "🇫🇲 ОБХОД №4-3"
 }, {
   "dns": {
     "servers": [
@@ -5032,7 +5032,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–5"
+  "remarks": "🇫🇲 ОБХОД №5"
 }, {
   "dns": {
     "servers": [
@@ -5156,7 +5156,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–6-1"
+  "remarks": "🇫🇲 ОБХОД №6-1"
 }, {
   "dns": {
     "servers": [
@@ -5280,7 +5280,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–6-2"
+  "remarks": "🇫🇲 ОБХОД №6-2"
 }, {
   "dns": {
     "servers": [
@@ -5404,7 +5404,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–6-3"
+  "remarks": "🇫🇲 ОБХОД №6-3"
 }, {
   "dns": {
     "servers": [
@@ -5528,7 +5528,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–7-1"
+  "remarks": "🇫🇲 ОБХОД №7-1"
 }, {
   "dns": {
     "servers": [
@@ -5652,7 +5652,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–7-2"
+  "remarks": "🇫🇲 ОБХОД №7-2"
 }, {
   "dns": {
     "servers": [
@@ -5776,7 +5776,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–7-3"
+  "remarks": "🇫🇲 ОБХОД №7-3"
 }, {
   "dns": {
     "servers": [
@@ -5900,7 +5900,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–8-1"
+  "remarks": "🇫🇲 ОБХОД №8-1"
 }, {
   "dns": {
     "servers": [
@@ -6024,7 +6024,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–8-2"
+  "remarks": "🇫🇲 ОБХОД №8-2"
 }, {
   "dns": {
     "servers": [
@@ -6148,7 +6148,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–8-3"
+  "remarks": "🇫🇲 ОБХОД №8-3"
 }, {
   "dns": {
     "servers": [
@@ -6272,7 +6272,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–9-1"
+  "remarks": "🇫🇲 ОБХОД №9-1"
 }, {
   "dns": {
     "servers": [
@@ -6396,7 +6396,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–9-2"
+  "remarks": "🇫🇲 ОБХОД №9-2"
 }, {
   "dns": {
     "servers": [
@@ -6520,7 +6520,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–9-3"
+  "remarks": "🇫🇲 ОБХОД №9-3"
 }, {
   "dns": {
     "servers": [
@@ -6644,7 +6644,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” TEST в„–1"
+  "remarks": "🇫🇲 ОБХОД TEST №1"
 }, {
   "dns": {
     "servers": [
@@ -6768,7 +6768,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” TEST в„–2"
+  "remarks": "🇫🇲 ОБХОД TEST №2"
 }, {
   "dns": {
     "servers": [
@@ -6892,7 +6892,7 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” TEST в„–3"
+  "remarks": "🇫🇲 ОБХОД TEST №3"
 }, {
   "dns": {
     "servers": [
@@ -7022,6 +7022,6 @@
       "protocol": "blackhole"
     }
   ],
-  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” TEST в„–4"
+  "remarks": "🇫🇲 ОБХОД TEST №4"
 }
 ]
