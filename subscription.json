@@ -47,7 +47,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -65,7 +65,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -221,7 +221,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -239,7 +239,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -395,7 +395,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -413,7 +413,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -569,7 +569,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -587,7 +587,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -743,7 +743,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -761,7 +761,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -917,7 +917,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -935,7 +935,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -1090,7 +1090,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -1108,7 +1108,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -1264,7 +1264,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -1282,7 +1282,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -1438,7 +1438,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -1456,7 +1456,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -1612,7 +1612,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -1630,7 +1630,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -1786,7 +1786,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -1804,7 +1804,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -1960,7 +1960,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -1978,7 +1978,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -2134,7 +2134,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -2152,7 +2152,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -2310,7 +2310,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -2328,7 +2328,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -2345,7 +2345,7 @@
     {
       "tag": "loopback-in",
       "port": 10901,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "dokodemo-door",
       "settings": {
         "address": "127.0.0.1",
@@ -3704,7 +3704,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -3722,7 +3722,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -3828,7 +3828,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -3846,7 +3846,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -3952,7 +3952,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -3970,7 +3970,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -4076,7 +4076,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -4094,7 +4094,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -4200,7 +4200,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -4218,7 +4218,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -4324,7 +4324,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -4342,7 +4342,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -4448,7 +4448,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -4466,7 +4466,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -4572,7 +4572,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -4590,7 +4590,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -4696,7 +4696,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -4714,7 +4714,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -4820,7 +4820,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -4838,7 +4838,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -4944,7 +4944,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -4962,7 +4962,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -5082,7 +5082,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -5100,7 +5100,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -5206,7 +5206,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -5224,7 +5224,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -5330,7 +5330,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -5348,7 +5348,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -5454,7 +5454,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -5472,7 +5472,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -5578,7 +5578,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -5596,7 +5596,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -5702,7 +5702,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -5720,7 +5720,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -5826,7 +5826,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -5844,7 +5844,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -5950,7 +5950,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -5968,7 +5968,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -6074,7 +6074,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -6092,7 +6092,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -6198,7 +6198,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -6216,7 +6216,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -6322,7 +6322,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -6340,7 +6340,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -6446,7 +6446,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -6464,7 +6464,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -6570,7 +6570,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -6588,7 +6588,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -6694,7 +6694,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -6712,7 +6712,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -6818,7 +6818,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -6836,7 +6836,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
@@ -6942,7 +6942,7 @@
     {
       "tag": "socks",
       "port": 10808,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "socks",
       "settings": {
         "udp": true,
@@ -6960,7 +6960,7 @@
     {
       "tag": "http",
       "port": 10809,
-      "listen": "127.0.0.1",
+      ,
       "protocol": "http",
       "settings": {
         "allowTransparent": false
