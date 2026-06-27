@@ -1,0 +1,7027 @@
+﻿[{
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "spb.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "spb.capynode.com",
+          "publicKey": "NU_cXjFyaF8VZVEn1fjuwhvlgOuqwN71NHtXPBwtmhk",
+          "shortId": "f186fe0d1b01f8cd",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡·рџ‡є Р РѕСЃСЃРёСЏ | YouTube"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru",
+          "lovable.dev"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:2ip.ru",
+          "domain:2ip.io",
+          "domain:habr.com",
+          "domain:4pda.to",
+          "domain:4pda.ru",
+          "domain:kemono.su",
+          "domain:jut.su",
+          "domain:kara.su",
+          "domain:theins.ru",
+          "domain:tvrain.ru",
+          "domain:echo.msk.ru",
+          "domain:the-village.ru",
+          "domain:snob.ru",
+          "domain:novayagazeta.ru",
+          "domain:moscowtimes.ru",
+          "domain:xboxlive.com",
+          "domain:xbox.com",
+          "domain:live.com",
+          "domain:login.live.com",
+          "domain:microsoft.com",
+          "domain:microsoftonline.com",
+          "domain:azure.com",
+          "domain:azureedge.net",
+          "domain:azurewebsites.net",
+          "domain:cloudapp.azure.com",
+          "domain:cloudapp.net",
+          "domain:msftcdn.net",
+          "domain:msftconnecttest.com",
+          "domain:msecnd.net",
+          "domain:akamaized.net",
+          "domain:akamaihd.net",
+          "domain:akamai.net",
+          "domain:akamaitechnologies.com",
+          "domain:edgesuite.net",
+          "domain:edgekey.net",
+          "domain:akadns.net",
+          "domain:flightsimulator.com"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "domain": [
+          "geosite:private",
+          "geosite:category-ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "jp.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "jp.capynode.com",
+          "publicKey": "ZW46Phpxg1QyuGxj8If1Um7oDwHCpaZTg1X18WdYT2U",
+          "shortId": "aed79a230354c234",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡Їрџ‡µ РЇРїРѕРЅРёСЏ"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru",
+          "lovable.dev"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:2ip.ru",
+          "domain:2ip.io",
+          "domain:habr.com",
+          "domain:4pda.to",
+          "domain:4pda.ru",
+          "domain:kemono.su",
+          "domain:jut.su",
+          "domain:kara.su",
+          "domain:theins.ru",
+          "domain:tvrain.ru",
+          "domain:echo.msk.ru",
+          "domain:the-village.ru",
+          "domain:snob.ru",
+          "domain:novayagazeta.ru",
+          "domain:moscowtimes.ru",
+          "domain:xboxlive.com",
+          "domain:xbox.com",
+          "domain:live.com",
+          "domain:login.live.com",
+          "domain:microsoft.com",
+          "domain:microsoftonline.com",
+          "domain:azure.com",
+          "domain:azureedge.net",
+          "domain:azurewebsites.net",
+          "domain:cloudapp.azure.com",
+          "domain:cloudapp.net",
+          "domain:msftcdn.net",
+          "domain:msftconnecttest.com",
+          "domain:msecnd.net",
+          "domain:akamaized.net",
+          "domain:akamaihd.net",
+          "domain:akamai.net",
+          "domain:akamaitechnologies.com",
+          "domain:edgesuite.net",
+          "domain:edgekey.net",
+          "domain:akadns.net",
+          "domain:flightsimulator.com"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "domain": [
+          "geosite:private",
+          "geosite:category-ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "de.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "de.capynode.com",
+          "publicKey": "r7ACBvhcUVJq5CvRNaoFd8Lv3d4K-Puc42rYO2oLeh4",
+          "shortId": "a6d7841b71de3fec",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡©рџ‡Є Р“РµСЂРјР°РЅРёСЏ"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru",
+          "lovable.dev"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:2ip.ru",
+          "domain:2ip.io",
+          "domain:habr.com",
+          "domain:4pda.to",
+          "domain:4pda.ru",
+          "domain:kemono.su",
+          "domain:jut.su",
+          "domain:kara.su",
+          "domain:theins.ru",
+          "domain:tvrain.ru",
+          "domain:echo.msk.ru",
+          "domain:the-village.ru",
+          "domain:snob.ru",
+          "domain:novayagazeta.ru",
+          "domain:moscowtimes.ru",
+          "domain:xboxlive.com",
+          "domain:xbox.com",
+          "domain:live.com",
+          "domain:login.live.com",
+          "domain:microsoft.com",
+          "domain:microsoftonline.com",
+          "domain:azure.com",
+          "domain:azureedge.net",
+          "domain:azurewebsites.net",
+          "domain:cloudapp.azure.com",
+          "domain:cloudapp.net",
+          "domain:msftcdn.net",
+          "domain:msftconnecttest.com",
+          "domain:msecnd.net",
+          "domain:akamaized.net",
+          "domain:akamaihd.net",
+          "domain:akamai.net",
+          "domain:akamaitechnologies.com",
+          "domain:edgesuite.net",
+          "domain:edgekey.net",
+          "domain:akadns.net",
+          "domain:flightsimulator.com"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "domain": [
+          "geosite:private",
+          "geosite:category-ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "se.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "se.capynode.com",
+          "publicKey": "Xp-7BRwbsMGRVbsorzhUjkBo4rimCjpDTedHV1-4Sm4",
+          "shortId": "eb1f50dba54fcc51",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡ёрџ‡Є РЁРІРµС†РёСЏ"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru",
+          "lovable.dev"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:2ip.ru",
+          "domain:2ip.io",
+          "domain:habr.com",
+          "domain:4pda.to",
+          "domain:4pda.ru",
+          "domain:kemono.su",
+          "domain:jut.su",
+          "domain:kara.su",
+          "domain:theins.ru",
+          "domain:tvrain.ru",
+          "domain:echo.msk.ru",
+          "domain:the-village.ru",
+          "domain:snob.ru",
+          "domain:novayagazeta.ru",
+          "domain:moscowtimes.ru",
+          "domain:xboxlive.com",
+          "domain:xbox.com",
+          "domain:live.com",
+          "domain:login.live.com",
+          "domain:microsoft.com",
+          "domain:microsoftonline.com",
+          "domain:azure.com",
+          "domain:azureedge.net",
+          "domain:azurewebsites.net",
+          "domain:cloudapp.azure.com",
+          "domain:cloudapp.net",
+          "domain:msftcdn.net",
+          "domain:msftconnecttest.com",
+          "domain:msecnd.net",
+          "domain:akamaized.net",
+          "domain:akamaihd.net",
+          "domain:akamai.net",
+          "domain:akamaitechnologies.com",
+          "domain:edgesuite.net",
+          "domain:edgekey.net",
+          "domain:akadns.net",
+          "domain:flightsimulator.com"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "domain": [
+          "geosite:private",
+          "geosite:category-ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "gb.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "gb.capynode.com",
+          "publicKey": "n39U-6covljB1_tlQw98uSQJca9GkeM03YljBMsJyUo",
+          "shortId": "d58a4da7c6900704",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡¬рџ‡§ Р’РµР»РёРєРѕР±СЂРёС‚Р°РЅРёСЏ"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru",
+          "lovable.dev"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:2ip.ru",
+          "domain:2ip.io",
+          "domain:habr.com",
+          "domain:4pda.to",
+          "domain:4pda.ru",
+          "domain:kemono.su",
+          "domain:jut.su",
+          "domain:kara.su",
+          "domain:theins.ru",
+          "domain:tvrain.ru",
+          "domain:echo.msk.ru",
+          "domain:the-village.ru",
+          "domain:snob.ru",
+          "domain:novayagazeta.ru",
+          "domain:moscowtimes.ru",
+          "domain:xboxlive.com",
+          "domain:xbox.com",
+          "domain:live.com",
+          "domain:login.live.com",
+          "domain:microsoft.com",
+          "domain:microsoftonline.com",
+          "domain:azure.com",
+          "domain:azureedge.net",
+          "domain:azurewebsites.net",
+          "domain:cloudapp.azure.com",
+          "domain:cloudapp.net",
+          "domain:msftcdn.net",
+          "domain:msftconnecttest.com",
+          "domain:msecnd.net",
+          "domain:akamaized.net",
+          "domain:akamaihd.net",
+          "domain:akamai.net",
+          "domain:akamaitechnologies.com",
+          "domain:edgesuite.net",
+          "domain:edgekey.net",
+          "domain:akadns.net",
+          "domain:flightsimulator.com"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "domain": [
+          "geosite:private",
+          "geosite:category-ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "hysteria",
+      "settings": {
+        "address": "nl2.capynode.com",
+        "port": 443,
+        "version": 2
+      },
+      "streamSettings": {
+        "network": "hysteria",
+        "hysteriaSettings": {
+          "version": 2,
+          "auth": "555060f2-d889-479c-a9f3-9e2dc53b94c4"
+        },
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "nl2.capynode.com",
+          "fingerprint": "chrome",
+          "alpn": [
+            "h3"
+          ]
+        },
+        "finalmask": {
+          "quicParams": {
+            "debug": false,
+            "congestion": "bbr"
+          }
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡ірџ‡± РќРёРґРµСЂР»Р°РЅРґС‹ рџЋ®"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru",
+          "lovable.dev"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:2ip.ru",
+          "domain:2ip.io",
+          "domain:habr.com",
+          "domain:4pda.to",
+          "domain:4pda.ru",
+          "domain:kemono.su",
+          "domain:jut.su",
+          "domain:kara.su",
+          "domain:theins.ru",
+          "domain:tvrain.ru",
+          "domain:echo.msk.ru",
+          "domain:the-village.ru",
+          "domain:snob.ru",
+          "domain:novayagazeta.ru",
+          "domain:moscowtimes.ru",
+          "domain:xboxlive.com",
+          "domain:xbox.com",
+          "domain:live.com",
+          "domain:login.live.com",
+          "domain:microsoft.com",
+          "domain:microsoftonline.com",
+          "domain:azure.com",
+          "domain:azureedge.net",
+          "domain:azurewebsites.net",
+          "domain:cloudapp.azure.com",
+          "domain:cloudapp.net",
+          "domain:msftcdn.net",
+          "domain:msftconnecttest.com",
+          "domain:msecnd.net",
+          "domain:akamaized.net",
+          "domain:akamaihd.net",
+          "domain:akamai.net",
+          "domain:akamaitechnologies.com",
+          "domain:edgesuite.net",
+          "domain:edgekey.net",
+          "domain:akadns.net",
+          "domain:flightsimulator.com"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "domain": [
+          "geosite:private",
+          "geosite:category-ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "sg.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "sg.capynode.com",
+          "publicKey": "wBGbKVrmLkLakVB5dfsYqkyrZNCUAvTe0xe0EkiG-Ek",
+          "shortId": "c2df4d52a3ecca8b",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡ёрџ‡¬ РЎРёРЅРіР°РїСѓСЂ"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru",
+          "lovable.dev"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:2ip.ru",
+          "domain:2ip.io",
+          "domain:habr.com",
+          "domain:4pda.to",
+          "domain:4pda.ru",
+          "domain:kemono.su",
+          "domain:jut.su",
+          "domain:kara.su",
+          "domain:theins.ru",
+          "domain:tvrain.ru",
+          "domain:echo.msk.ru",
+          "domain:the-village.ru",
+          "domain:snob.ru",
+          "domain:novayagazeta.ru",
+          "domain:moscowtimes.ru",
+          "domain:xboxlive.com",
+          "domain:xbox.com",
+          "domain:live.com",
+          "domain:login.live.com",
+          "domain:microsoft.com",
+          "domain:microsoftonline.com",
+          "domain:azure.com",
+          "domain:azureedge.net",
+          "domain:azurewebsites.net",
+          "domain:cloudapp.azure.com",
+          "domain:cloudapp.net",
+          "domain:msftcdn.net",
+          "domain:msftconnecttest.com",
+          "domain:msecnd.net",
+          "domain:akamaized.net",
+          "domain:akamaihd.net",
+          "domain:akamai.net",
+          "domain:akamaitechnologies.com",
+          "domain:edgesuite.net",
+          "domain:edgekey.net",
+          "domain:akadns.net",
+          "domain:flightsimulator.com"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "domain": [
+          "geosite:private",
+          "geosite:category-ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "lt.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "lt.capynode.com",
+          "publicKey": "INEKt0u7vwCc40JlMx7cq2tqE5iv6VuVL-dmLPE3QlM",
+          "shortId": "cdf1756a07bbe6e4",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡±рџ‡№ Р›РёС‚РІР°"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru",
+          "lovable.dev"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:2ip.ru",
+          "domain:2ip.io",
+          "domain:habr.com",
+          "domain:4pda.to",
+          "domain:4pda.ru",
+          "domain:kemono.su",
+          "domain:jut.su",
+          "domain:kara.su",
+          "domain:theins.ru",
+          "domain:tvrain.ru",
+          "domain:echo.msk.ru",
+          "domain:the-village.ru",
+          "domain:snob.ru",
+          "domain:novayagazeta.ru",
+          "domain:moscowtimes.ru",
+          "domain:xboxlive.com",
+          "domain:xbox.com",
+          "domain:live.com",
+          "domain:login.live.com",
+          "domain:microsoft.com",
+          "domain:microsoftonline.com",
+          "domain:azure.com",
+          "domain:azureedge.net",
+          "domain:azurewebsites.net",
+          "domain:cloudapp.azure.com",
+          "domain:cloudapp.net",
+          "domain:msftcdn.net",
+          "domain:msftconnecttest.com",
+          "domain:msecnd.net",
+          "domain:akamaized.net",
+          "domain:akamaihd.net",
+          "domain:akamai.net",
+          "domain:akamaitechnologies.com",
+          "domain:edgesuite.net",
+          "domain:edgekey.net",
+          "domain:akadns.net",
+          "domain:flightsimulator.com"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "domain": [
+          "geosite:private",
+          "geosite:category-ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "fi.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "fi.capynode.com",
+          "publicKey": "xszg43Ed5ZhbhVLFgfff2RzySVn7Q_PGpfmNaQV3fhs",
+          "shortId": "ef33a26b4c7f37b1",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡® Р¤РёРЅР»СЏРЅРґРёСЏ"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru",
+          "lovable.dev"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:2ip.ru",
+          "domain:2ip.io",
+          "domain:habr.com",
+          "domain:4pda.to",
+          "domain:4pda.ru",
+          "domain:kemono.su",
+          "domain:jut.su",
+          "domain:kara.su",
+          "domain:theins.ru",
+          "domain:tvrain.ru",
+          "domain:echo.msk.ru",
+          "domain:the-village.ru",
+          "domain:snob.ru",
+          "domain:novayagazeta.ru",
+          "domain:moscowtimes.ru",
+          "domain:xboxlive.com",
+          "domain:xbox.com",
+          "domain:live.com",
+          "domain:login.live.com",
+          "domain:microsoft.com",
+          "domain:microsoftonline.com",
+          "domain:azure.com",
+          "domain:azureedge.net",
+          "domain:azurewebsites.net",
+          "domain:cloudapp.azure.com",
+          "domain:cloudapp.net",
+          "domain:msftcdn.net",
+          "domain:msftconnecttest.com",
+          "domain:msecnd.net",
+          "domain:akamaized.net",
+          "domain:akamaihd.net",
+          "domain:akamai.net",
+          "domain:akamaitechnologies.com",
+          "domain:edgesuite.net",
+          "domain:edgekey.net",
+          "domain:akadns.net",
+          "domain:flightsimulator.com"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "domain": [
+          "geosite:private",
+          "geosite:category-ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "us.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "us.capynode.com",
+          "publicKey": "k_V46vu42Af3eSp09EvF6AHzVmk6q_K36M7UUHOHemc",
+          "shortId": "e34c7b69a5f7318e",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡єрџ‡ё РЎРЁРђ"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru",
+          "lovable.dev"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:2ip.ru",
+          "domain:2ip.io",
+          "domain:habr.com",
+          "domain:4pda.to",
+          "domain:4pda.ru",
+          "domain:kemono.su",
+          "domain:jut.su",
+          "domain:kara.su",
+          "domain:theins.ru",
+          "domain:tvrain.ru",
+          "domain:echo.msk.ru",
+          "domain:the-village.ru",
+          "domain:snob.ru",
+          "domain:novayagazeta.ru",
+          "domain:moscowtimes.ru",
+          "domain:xboxlive.com",
+          "domain:xbox.com",
+          "domain:live.com",
+          "domain:login.live.com",
+          "domain:microsoft.com",
+          "domain:microsoftonline.com",
+          "domain:azure.com",
+          "domain:azureedge.net",
+          "domain:azurewebsites.net",
+          "domain:cloudapp.azure.com",
+          "domain:cloudapp.net",
+          "domain:msftcdn.net",
+          "domain:msftconnecttest.com",
+          "domain:msecnd.net",
+          "domain:akamaized.net",
+          "domain:akamaihd.net",
+          "domain:akamai.net",
+          "domain:akamaitechnologies.com",
+          "domain:edgesuite.net",
+          "domain:edgekey.net",
+          "domain:akadns.net",
+          "domain:flightsimulator.com"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "domain": [
+          "geosite:private",
+          "geosite:category-ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "pl.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "pl.capynode.com",
+          "publicKey": "6r-Ca9gX4gkVOxytJBCjAvzV7hMwwfwZHpXXjWe9wC0",
+          "shortId": "bd7ffec6622665bd",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡µрџ‡± РџРѕР»СЊС€Р°"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru",
+          "lovable.dev"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:2ip.ru",
+          "domain:2ip.io",
+          "domain:habr.com",
+          "domain:4pda.to",
+          "domain:4pda.ru",
+          "domain:kemono.su",
+          "domain:jut.su",
+          "domain:kara.su",
+          "domain:theins.ru",
+          "domain:tvrain.ru",
+          "domain:echo.msk.ru",
+          "domain:the-village.ru",
+          "domain:snob.ru",
+          "domain:novayagazeta.ru",
+          "domain:moscowtimes.ru",
+          "domain:xboxlive.com",
+          "domain:xbox.com",
+          "domain:live.com",
+          "domain:login.live.com",
+          "domain:microsoft.com",
+          "domain:microsoftonline.com",
+          "domain:azure.com",
+          "domain:azureedge.net",
+          "domain:azurewebsites.net",
+          "domain:cloudapp.azure.com",
+          "domain:cloudapp.net",
+          "domain:msftcdn.net",
+          "domain:msftconnecttest.com",
+          "domain:msecnd.net",
+          "domain:akamaized.net",
+          "domain:akamaihd.net",
+          "domain:akamai.net",
+          "domain:akamaitechnologies.com",
+          "domain:edgesuite.net",
+          "domain:edgekey.net",
+          "domain:akadns.net",
+          "domain:flightsimulator.com"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "domain": [
+          "geosite:private",
+          "geosite:category-ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "ch.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "ch.capynode.com",
+          "publicKey": "xHlo6FEjiUhFGWfAhEithJWZ2OapxTe7g0Uw498U3XI",
+          "shortId": "f7d1ba7d977ade6c",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡Ёрџ‡­ РЁРІРµР№С†Р°СЂРёСЏ"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru",
+          "lovable.dev"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:2ip.ru",
+          "domain:2ip.io",
+          "domain:habr.com",
+          "domain:4pda.to",
+          "domain:4pda.ru",
+          "domain:kemono.su",
+          "domain:jut.su",
+          "domain:kara.su",
+          "domain:theins.ru",
+          "domain:tvrain.ru",
+          "domain:echo.msk.ru",
+          "domain:the-village.ru",
+          "domain:snob.ru",
+          "domain:novayagazeta.ru",
+          "domain:moscowtimes.ru",
+          "domain:xboxlive.com",
+          "domain:xbox.com",
+          "domain:live.com",
+          "domain:login.live.com",
+          "domain:microsoft.com",
+          "domain:microsoftonline.com",
+          "domain:azure.com",
+          "domain:azureedge.net",
+          "domain:azurewebsites.net",
+          "domain:cloudapp.azure.com",
+          "domain:cloudapp.net",
+          "domain:msftcdn.net",
+          "domain:msftconnecttest.com",
+          "domain:msecnd.net",
+          "domain:akamaized.net",
+          "domain:akamaihd.net",
+          "domain:akamai.net",
+          "domain:akamaitechnologies.com",
+          "domain:edgesuite.net",
+          "domain:edgekey.net",
+          "domain:akadns.net",
+          "domain:flightsimulator.com"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "domain": [
+          "geosite:private",
+          "geosite:category-ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "by.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "by.capynode.com",
+          "publicKey": "kmUTHyW5iaY4k3IEQHuOFhd87gQE5PuplLf48D-Lp1I",
+          "shortId": "f1ebe89f2b112d64",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡§рџ‡ѕ Р‘РµР»Р°СЂСѓСЃСЊ"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "network": "tcp,udp",
+        "inboundTag": [
+          "loopback-in"
+        ],
+        "balancerTag": "FALLBACK_BYPASS"
+      },
+      {
+        "network": "tcp,udp",
+        "balancerTag": "SMART_EU"
+      }
+    ],
+    "balancers": [
+      {
+        "tag": "SMART_EU",
+        "selector": [
+          "eu"
+        ],
+        "strategy": {
+          "type": "leastLoad",
+          "settings": {
+            "maxRTT": "800ms",
+            "expected": 4,
+            "baselines": [
+              "200ms",
+              "400ms"
+            ],
+            "tolerance": 0
+          }
+        },
+        "fallbackTag": "loopback-out"
+      },
+      {
+        "tag": "FALLBACK_BYPASS",
+        "selector": [
+          "bypass"
+        ],
+        "strategy": {
+          "type": "leastLoad",
+          "settings": {
+            "maxRTT": "500ms",
+            "expected": 30,
+            "baselines": [
+              "100ms",
+              "300ms"
+            ],
+            "tolerance": 0
+          }
+        }
+      }
+    ],
+    "domainMatcher": "hybrid",
+    "domainStrategy": "IPIfNonMatch"
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "loopback-in",
+      "port": 10901,
+      "listen": "127.0.0.1",
+      "protocol": "dokodemo-door",
+      "settings": {
+        "address": "127.0.0.1",
+        "network": "tcp,udp"
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "eu",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "de.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "de.capynode.com",
+          "publicKey": "r7ACBvhcUVJq5CvRNaoFd8Lv3d4K-Puc42rYO2oLeh4",
+          "shortId": "a6d7841b71de3fec",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "eu-2",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "lt.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "lt.capynode.com",
+          "publicKey": "INEKt0u7vwCc40JlMx7cq2tqE5iv6VuVL-dmLPE3QlM",
+          "shortId": "cdf1756a07bbe6e4",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "eu-3",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "nl.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "nl.capynode.com",
+          "publicKey": "qrD8rYRLJvxFbVCooZl9DgZzQN43grPH366x7edPeFs",
+          "shortId": "f3b30f1ac35435b1",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "eu-4",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "ch.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "ch.capynode.com",
+          "publicKey": "xHlo6FEjiUhFGWfAhEithJWZ2OapxTe7g0Uw498U3XI",
+          "shortId": "f7d1ba7d977ade6c",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "eu-5",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "se.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "se.capynode.com",
+          "publicKey": "Xp-7BRwbsMGRVbsorzhUjkBo4rimCjpDTedHV1-4Sm4",
+          "shortId": "eb1f50dba54fcc51",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "eu-6",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "us.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "us.capynode.com",
+          "publicKey": "k_V46vu42Af3eSp09EvF6AHzVmk6q_K36M7UUHOHemc",
+          "shortId": "e34c7b69a5f7318e",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "eu-7",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "pl.capynode.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "pl.capynode.com",
+          "publicKey": "6r-Ca9gX4gkVOxytJBCjAvzV7hMwwfwZHpXXjWe9wC0",
+          "shortId": "bd7ffec6622665bd",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "51.250.83.32",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "lM4aY7R07Gem9x-TKqvCuKcZSLuZU-_2lyZqxmQLHDs",
+          "shortId": "a9e95077bdf34209",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-2",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "51.250.83.32",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "a-pxMyDrgkZ4eAM_I7k0mJiBn3AN0eyqeiSGtV03F1U",
+          "shortId": "d30f4e10dc056830",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-3",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "51.250.83.32",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "max.ru",
+          "publicKey": "wi0mLRyP_rX2sM_uqvDeILAN7_2mDnZ4DmAlC4okjXQ",
+          "shortId": "ce1ad22ee3205e62",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-4",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.201.176.179",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "lM4aY7R07Gem9x-TKqvCuKcZSLuZU-_2lyZqxmQLHDs",
+          "shortId": "a9e95077bdf34209",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-5",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.201.176.179",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "a-pxMyDrgkZ4eAM_I7k0mJiBn3AN0eyqeiSGtV03F1U",
+          "shortId": "d30f4e10dc056830",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-6",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.201.176.179",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "max.ru",
+          "publicKey": "wi0mLRyP_rX2sM_uqvDeILAN7_2mDnZ4DmAlC4okjXQ",
+          "shortId": "ce1ad22ee3205e62",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-7",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.201.158.83",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "lM4aY7R07Gem9x-TKqvCuKcZSLuZU-_2lyZqxmQLHDs",
+          "shortId": "a9e95077bdf34209",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-8",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.201.158.83",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "a-pxMyDrgkZ4eAM_I7k0mJiBn3AN0eyqeiSGtV03F1U",
+          "shortId": "d30f4e10dc056830",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-9",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.201.158.83",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "max.ru",
+          "publicKey": "wi0mLRyP_rX2sM_uqvDeILAN7_2mDnZ4DmAlC4okjXQ",
+          "shortId": "ce1ad22ee3205e62",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-10",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "51.250.95.42",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "smartcaptcha.yandexcloud.net",
+          "publicKey": "RJtIKw17_0x-zmAL0vL4FrgeKqxHt2Faai-oSTBPmWI",
+          "shortId": "ef276a7580e24ac8",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-11",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "51.250.95.42",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "api-maps.yandex.ru",
+          "publicKey": "qpyc7QJdCOHqHOkdzoQeH7leZKi8c_ldUAhPmxImWFo",
+          "shortId": "e11822a0958dd1a3",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-12",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "51.250.95.42",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "ads.x5.ru",
+          "publicKey": "73LOtZvtJoUx42LIIHdr6GTrzZkA_5RJy_olEG2qQXQ",
+          "shortId": "e11822a0958dd1a3",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-13",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.201.136.40",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "smartcaptcha.yandexcloud.net",
+          "publicKey": "RJtIKw17_0x-zmAL0vL4FrgeKqxHt2Faai-oSTBPmWI",
+          "shortId": "ef276a7580e24ac8",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-14",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.201.136.40",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "api-maps.yandex.ru",
+          "publicKey": "qpyc7QJdCOHqHOkdzoQeH7leZKi8c_ldUAhPmxImWFo",
+          "shortId": "e11822a0958dd1a3",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-15",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.201.136.40",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "ads.x5.ru",
+          "publicKey": "73LOtZvtJoUx42LIIHdr6GTrzZkA_5RJy_olEG2qQXQ",
+          "shortId": "e11822a0958dd1a3",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-16",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.201.131.127",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "smartcaptcha.yandexcloud.net",
+          "publicKey": "RJtIKw17_0x-zmAL0vL4FrgeKqxHt2Faai-oSTBPmWI",
+          "shortId": "ef276a7580e24ac8",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-17",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.201.131.127",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "api-maps.yandex.ru",
+          "publicKey": "qpyc7QJdCOHqHOkdzoQeH7leZKi8c_ldUAhPmxImWFo",
+          "shortId": "e11822a0958dd1a3",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-18",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.201.131.127",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "ads.x5.ru",
+          "publicKey": "73LOtZvtJoUx42LIIHdr6GTrzZkA_5RJy_olEG2qQXQ",
+          "shortId": "e11822a0958dd1a3",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-19",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "62.152.58.205",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "Rde4-AW3R30RbpIkfiRcPdFalUsLAUdgerk2IYjwkBA",
+          "shortId": "d8b81daaad76dc9c",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-20",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "62.152.58.205",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "uqKo06QN98uCn95hbm3HhrMJTkS0tm3e6DZ7IDe1_gY",
+          "shortId": "d7b684f29aaea33a",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-21",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "62.152.58.207",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "Rde4-AW3R30RbpIkfiRcPdFalUsLAUdgerk2IYjwkBA",
+          "shortId": "d8b81daaad76dc9c",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-22",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "62.152.58.207",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "uqKo06QN98uCn95hbm3HhrMJTkS0tm3e6DZ7IDe1_gY",
+          "shortId": "d7b684f29aaea33a",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-23",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "62.152.58.208",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "Rde4-AW3R30RbpIkfiRcPdFalUsLAUdgerk2IYjwkBA",
+          "shortId": "d8b81daaad76dc9c",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-24",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "62.152.58.208",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "uqKo06QN98uCn95hbm3HhrMJTkS0tm3e6DZ7IDe1_gY",
+          "shortId": "d7b684f29aaea33a",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "bypass-25",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "185.154.20.18",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "ZlXBEYDy1NPe1mLvq7j8CCB9fBIaIvc8X3UZsbVxNT8",
+          "shortId": "ae03e6ef452252e0",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "bypass-26",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "185.154.20.18",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "djV0ofrWaRYqyKIgjuXuDGZt3QmkfDwyBk-ro_nv1zs",
+          "shortId": "b175ae75e2a15bf0",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "bypass-27",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "46.8.18.166",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "ZlXBEYDy1NPe1mLvq7j8CCB9fBIaIvc8X3UZsbVxNT8",
+          "shortId": "ae03e6ef452252e0",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "bypass-28",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "46.8.18.166",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "djV0ofrWaRYqyKIgjuXuDGZt3QmkfDwyBk-ro_nv1zs",
+          "shortId": "b175ae75e2a15bf0",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "bypass-29",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "46.8.18.38",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "ZlXBEYDy1NPe1mLvq7j8CCB9fBIaIvc8X3UZsbVxNT8",
+          "shortId": "ae03e6ef452252e0",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "bypass-30",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "46.8.18.38",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "djV0ofrWaRYqyKIgjuXuDGZt3QmkfDwyBk-ro_nv1zs",
+          "shortId": "b175ae75e2a15bf0",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "bypass-31",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "46.8.209.224",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "ZlXBEYDy1NPe1mLvq7j8CCB9fBIaIvc8X3UZsbVxNT8",
+          "shortId": "ae03e6ef452252e0",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "bypass-32",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "46.8.209.224",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "djV0ofrWaRYqyKIgjuXuDGZt3QmkfDwyBk-ro_nv1zs",
+          "shortId": "b175ae75e2a15bf0",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "bypass-33",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "46.8.209.215",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "ZlXBEYDy1NPe1mLvq7j8CCB9fBIaIvc8X3UZsbVxNT8",
+          "shortId": "ae03e6ef452252e0",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "bypass-34",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "46.8.209.215",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "djV0ofrWaRYqyKIgjuXuDGZt3QmkfDwyBk-ro_nv1zs",
+          "shortId": "b175ae75e2a15bf0",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    },
+    {
+      "tag": "loopback-out",
+      "protocol": "loopback",
+      "settings": {
+        "inboundTag": "loopback-in"
+      }
+    }
+  ],
+  "burstObservatory": {
+    "pingConfig": {
+      "timeout": "3s",
+      "interval": "120s",
+      "sampling": 1,
+      "destination": "http://www.gstatic.com/generate_204",
+      "connectivity": ""
+    },
+    "subjectSelector": [
+      "eu",
+      "bypass"
+    ]
+  },
+  "remarks": "рџ‡«рџ‡І РђР’РўРћ РћР‘РҐРћР”"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "ct.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "ZlXBEYDy1NPe1mLvq7j8CCB9fBIaIvc8X3UZsbVxNT8",
+          "shortId": "ae03e6ef452252e0",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–0-1"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "ct.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "djV0ofrWaRYqyKIgjuXuDGZt3QmkfDwyBk-ro_nv1zs",
+          "shortId": "b175ae75e2a15bf0",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–0-2"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "46.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "ZlXBEYDy1NPe1mLvq7j8CCB9fBIaIvc8X3UZsbVxNT8",
+          "shortId": "ae03e6ef452252e0",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–1-1"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "46.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "djV0ofrWaRYqyKIgjuXuDGZt3QmkfDwyBk-ro_nv1zs",
+          "shortId": "b175ae75e2a15bf0",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–1-2"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "data.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "Rde4-AW3R30RbpIkfiRcPdFalUsLAUdgerk2IYjwkBA",
+          "shortId": "d8b81daaad76dc9c",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–2-1"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "data.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "uqKo06QN98uCn95hbm3HhrMJTkS0tm3e6DZ7IDe1_gY",
+          "shortId": "d7b684f29aaea33a",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–2-2"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "194.135.34.145",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "rudlcbs-1.capynode.com",
+          "publicKey": "Xp-7BRwbsMGRVbsorzhUjkBo4rimCjpDTedHV1-4Sm4",
+          "shortId": "eb1f50dba54fcc51",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–3"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "185.22.235.28",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "2bN0bv7FN0z-WHlpUuiIEGPb3yWmjWEZd3VmFIdpk1s",
+          "shortId": "b9d330fe200e4f4e",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–4-1"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "185.22.235.28",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "k75fMk9eTvD53_SEH1Nc0iCTX6-m8AoFZQOroUB52H4",
+          "shortId": "d7b975a0b00be730",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–4-2"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "185.22.235.28",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "ads.x5.ru",
+          "publicKey": "KJUVvApjTYpz5QQwN-QnQM4DqfzFIY8S6gv-xyWx9mQ",
+          "shortId": "fb7bcadf992e2411",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–4-3"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "fgwy.capybara.press",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": ""
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "xhttpSettings": {
+          "mode": "packet-up",
+          "host": "fgwy.capybara.press",
+          "path": "/uploadfiles/",
+          "extra": {
+            "xPaddingKey": "_dc",
+            "xPaddingHeader": "X-Cache",
+            "xPaddingMethod": "tokenish",
+            "uplinkHTTPMethod": "GET",
+            "xPaddingObfsMode": true,
+            "xPaddingPlacement": "queryInHeader"
+          }
+        },
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "fgwy.capybara.press",
+          "fingerprint": "chrome",
+          "alpn": [
+            "h3",
+            "h2",
+            "http/1.1"
+          ]
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–5"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "51n.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "lM4aY7R07Gem9x-TKqvCuKcZSLuZU-_2lyZqxmQLHDs",
+          "shortId": "a9e95077bdf34209",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–6-1"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "51n.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "a-pxMyDrgkZ4eAM_I7k0mJiBn3AN0eyqeiSGtV03F1U",
+          "shortId": "d30f4e10dc056830",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–6-2"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "51n.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "max.ru",
+          "publicKey": "wi0mLRyP_rX2sM_uqvDeILAN7_2mDnZ4DmAlC4okjXQ",
+          "shortId": "ce1ad22ee3205e62",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–6-3"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "51.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "smartcaptcha.yandexcloud.net",
+          "publicKey": "RJtIKw17_0x-zmAL0vL4FrgeKqxHt2Faai-oSTBPmWI",
+          "shortId": "ef276a7580e24ac8",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–7-1"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "51.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "api-maps.yandex.ru",
+          "publicKey": "qpyc7QJdCOHqHOkdzoQeH7leZKi8c_ldUAhPmxImWFo",
+          "shortId": "e11822a0958dd1a3",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–7-2"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "51.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "api-maps.yandex.ru",
+          "publicKey": "qpyc7QJdCOHqHOkdzoQeH7leZKi8c_ldUAhPmxImWFo",
+          "shortId": "e11822a0958dd1a3",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–7-3"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84n.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "lM4aY7R07Gem9x-TKqvCuKcZSLuZU-_2lyZqxmQLHDs",
+          "shortId": "a9e95077bdf34209",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–8-1"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84n.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "a-pxMyDrgkZ4eAM_I7k0mJiBn3AN0eyqeiSGtV03F1U",
+          "shortId": "d30f4e10dc056830",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–8-2"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84n.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "max.ru",
+          "publicKey": "wi0mLRyP_rX2sM_uqvDeILAN7_2mDnZ4DmAlC4okjXQ",
+          "shortId": "ce1ad22ee3205e62",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–8-3"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "smartcaptcha.yandexcloud.net",
+          "publicKey": "RJtIKw17_0x-zmAL0vL4FrgeKqxHt2Faai-oSTBPmWI",
+          "shortId": "ef276a7580e24ac8",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–9-1"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "api-maps.yandex.ru",
+          "publicKey": "qpyc7QJdCOHqHOkdzoQeH7leZKi8c_ldUAhPmxImWFo",
+          "shortId": "e11822a0958dd1a3",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–9-2"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "84.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "ads.x5.ru",
+          "publicKey": "73LOtZvtJoUx42LIIHdr6GTrzZkA_5RJy_olEG2qQXQ",
+          "shortId": "e11822a0958dd1a3",
+          "spiderX": "/",
+          "fingerprint": "firefox"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” в„–9-3"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "176.109.92.219",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "2bN0bv7FN0z-WHlpUuiIEGPb3yWmjWEZd3VmFIdpk1s",
+          "shortId": "b9d330fe200e4f4e",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” TEST в„–1"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "176.109.92.219",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "k75fMk9eTvD53_SEH1Nc0iCTX6-m8AoFZQOroUB52H4",
+          "shortId": "d7b975a0b00be730",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” TEST в„–2"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "176.109.92.219",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "ads.x5.ru",
+          "publicKey": "KJUVvApjTYpz5QQwN-QnQM4DqfzFIY8S6gv-xyWx9mQ",
+          "shortId": "fb7bcadf992e2411",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” TEST в„–3"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "s96705.cdn.ngenix.net",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": ""
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/v1/data/sync/",
+          "headers": {
+            "Host": "s96705.cdn.ngenix.net"
+          },
+          "heartbeatPeriod": 20
+        },
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "s96705.cdn.ngenix.net",
+          "fingerprint": "chrome",
+          "alpn": [
+            "http/1.1"
+          ]
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "рџ‡«рџ‡І РћР‘РҐРћР” TEST в„–4"
+}
+]
