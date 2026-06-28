@@ -1438,6 +1438,179 @@
     {
       "tag": "socks",
       "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "hysteria",
+      "settings": {
+        "address": "lt2.capynode.com",
+        "port": 443,
+        "version": 2
+      },
+      "streamSettings": {
+        "network": "hysteria",
+        "hysteriaSettings": {
+          "version": 2,
+          "auth": "555060f2-d889-479c-a9f3-9e2dc53b94c4"
+        },
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "lt2.capynode.com",
+          "fingerprint": "chrome",
+          "alpn": [
+            "h3"
+          ]
+        },
+        "finalmask": {
+          "quicParams": {
+            "debug": false,
+            "congestion": "bbr"
+          }
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "🇱🇹 Литва 🎮"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mtalk.google.com",
+          "domain:push.apple.com",
+          "domain:api.push.apple.com",
+          "domain:push-apple.com.akadns.net",
+          "domain:courier.push.apple.com",
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru",
+          "lovable.dev"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:2ip.ru",
+          "domain:2ip.io",
+          "domain:habr.com",
+          "domain:4pda.to",
+          "domain:4pda.ru",
+          "domain:kemono.su",
+          "domain:jut.su",
+          "domain:kara.su",
+          "domain:theins.ru",
+          "domain:tvrain.ru",
+          "domain:echo.msk.ru",
+          "domain:the-village.ru",
+          "domain:snob.ru",
+          "domain:novayagazeta.ru",
+          "domain:moscowtimes.ru",
+          "domain:xboxlive.com",
+          "domain:xbox.com",
+          "domain:live.com",
+          "domain:login.live.com",
+          "domain:microsoft.com",
+          "domain:microsoftonline.com",
+          "domain:azure.com",
+          "domain:azureedge.net",
+          "domain:azurewebsites.net",
+          "domain:cloudapp.azure.com",
+          "domain:cloudapp.net",
+          "domain:msftcdn.net",
+          "domain:msftconnecttest.com",
+          "domain:msecnd.net",
+          "domain:akamaized.net",
+          "domain:akamaihd.net",
+          "domain:akamai.net",
+          "domain:akamaitechnologies.com",
+          "domain:edgesuite.net",
+          "domain:edgekey.net",
+          "domain:akadns.net",
+          "domain:flightsimulator.com"
+        ],
+        "outboundTag": "proxy"
+      },
+      {
+        "domain": [
+          "geosite:private",
+          "geosite:category-ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
 
       "protocol": "socks",
       "settings": {
