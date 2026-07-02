@@ -1,0 +1,5 @@
+/subscription.json
+  profile-title: "Моя подписка"
+  profile-update-interval: "12"
+  subscription-userinfo: "upload=0; download=0; total=10000000000; expire=1749954800"
+  announce: "Добро пожаловать! Обновления каждые 12 часов."
