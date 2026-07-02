@@ -1,0 +1,13 @@
+{
+  "name": "Моя подписка",
+  "avatar": "https://raw.githubusercontent.com/damoyri/subscription/main/avatar.png",
+  "traffic": {
+    "upload": 0,
+    "download": 0,
+    "total": 10000000000,
+    "expire": 1749954800
+  },
+  "servers": [
+    // СЮДА ВСТАВЬТЕ ВЕСЬ ВАШ МАССИВ КОНФИГОВ (то, что сейчас в subscription.json)
+  ]
+}
