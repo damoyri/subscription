@@ -5062,6 +5062,357 @@
       },
       {
         "domain": [
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "31.177.111.141",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "VnDrhThFzBluAqX0bLz6s9Ef04I5eNFtT6tHQtyuPFI",
+          "shortId": "b9d330fe200e4f4e",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "🇫🇲 ОБХОД №3-1"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "31.177.111.141",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "2r6N7Ee1GrBZi_4W9dLt6HvUtLAXGvE_BuWg_V9cJ04",
+          "shortId": "d7b975a0b00be730",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "🇫🇲 ОБХОД №3-2"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "31.177.111.141",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "ads.x5.ru",
+          "publicKey": "IzFgGhHuRt6C42-JLmSFAac4S6_uhc6a9RdEBXhiZmA",
+          "shortId": "fb7bcadf992e2411",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "🇫🇲 ОБХОД №3-3"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
           "domain:mtalk.google.com",
           "domain:push.apple.com",
           "domain:api.push.apple.com",
@@ -5551,6 +5902,357 @@
     }
   ],
   "remarks": "🇫🇲 ОБХОД №5"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "194.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.vk.com",
+          "publicKey": "IbzmW38I33BKfw1ypaqUrvUHwVcLb4jjY95uEVi4cVI",
+          "shortId": "b9d330fe200e4f4e",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "🇫🇲 ОБХОД №5-1"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "194.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "yandex.ru",
+          "publicKey": "dUgmee6jz2o7MYnSnpqg1i-bXdSGdVIg49ic4zuzbgo",
+          "shortId": "d7b975a0b00be730",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "🇫🇲 ОБХОД №5-2"
+}, {
+  "dns": {
+    "servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "queryStrategy": "UseIPv4"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "rules": [
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "domain:mangabuff.ru",
+          "domain:yandex.com",
+          "domain:yandex.net",
+          "domain:mail.ru",
+          "domain:vk.com",
+          "domain:vkusvill.ru",
+          "domain:ozon.ru",
+          "domain:wildberries.ru",
+          "domain:tinkoff.ru",
+          "domain:gosuslugi.ru",
+          "domain:nalog.gov.ru",
+          "domain:mos.ru",
+          "domain:2gis.com",
+          "domain:2gis.ru"
+        ],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "protocol": "socks",
+      "settings": {
+        "udp": true,
+        "auth": "noauth"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "194.capycore.ru",
+            "port": 443,
+            "users": [
+              {
+                "id": "555060f2-d889-479c-a9f3-9e2dc53b94c4",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "tcpSettings": {},
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "ads.x5.ru",
+          "publicKey": "cs3rjd3sEWQgm3remEcWXqyxANbJAAWjEHfGNOU-KwE",
+          "shortId": "fb7bcadf992e2411",
+          "spiderX": "/",
+          "fingerprint": "qq"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "remarks": "🇫🇲 ОБХОД №5-3"
 }, {
   "dns": {
     "servers": [
