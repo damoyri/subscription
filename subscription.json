@@ -8254,38 +8254,6 @@
   "log": {
     "loglevel": "warning"
   },
-  "observatory": {
-    "subjectSelector": [
-      "proxy-0-1", "proxy-0-2", "proxy-1-1", "proxy-1-2",
-      "proxy-2-1", "proxy-2-2", "proxy-3", "proxy-3-1",
-      "proxy-3-2", "proxy-3-3", "proxy-4-1", "proxy-4-2",
-      "proxy-4-3", "proxy-5", "proxy-5-1", "proxy-5-2",
-      "proxy-5-3", "proxy-6-1", "proxy-6-2", "proxy-6-3",
-      "proxy-7-1", "proxy-7-2", "proxy-7-3", "proxy-8-1",
-      "proxy-8-2", "proxy-8-3", "proxy-9-1", "proxy-9-2",
-      "proxy-9-3", "proxy-TEST-1", "proxy-TEST-2", "proxy-TEST-3",
-      "proxy-TEST-4"
-    ],
-    "probeInterval": "30s",
-    "probeTimeout": "5s"
-  },
-  "balancer": {
-    "tag": "balancer",
-    "selector": [
-      "proxy-0-1", "proxy-0-2", "proxy-1-1", "proxy-1-2",
-      "proxy-2-1", "proxy-2-2", "proxy-3", "proxy-3-1",
-      "proxy-3-2", "proxy-3-3", "proxy-4-1", "proxy-4-2",
-      "proxy-4-3", "proxy-5", "proxy-5-1", "proxy-5-2",
-      "proxy-5-3", "proxy-6-1", "proxy-6-2", "proxy-6-3",
-      "proxy-7-1", "proxy-7-2", "proxy-7-3", "proxy-8-1",
-      "proxy-8-2", "proxy-8-3", "proxy-9-1", "proxy-9-2",
-      "proxy-9-3", "proxy-TEST-1", "proxy-TEST-2", "proxy-TEST-3",
-      "proxy-TEST-4"
-    ],
-    "strategy": {
-      "type": "leastPing"
-    }
-  },
   "routing": {
     "rules": [
       {
@@ -8317,10 +8285,42 @@
         "outboundTag": "direct"
       },
       {
+        "inboundTag": ["loopback-in"],
+        "outboundTag": "direct"
+      },
+      {
         "network": "tcp,udp",
-        "outboundTag": "balancer"
+        "balancerTag": "AUTO_BYPASS"
       }
-    ]
+    ],
+    "balancers": [
+      {
+        "tag": "AUTO_BYPASS",
+        "selector": [
+          "bypass-0-1","bypass-0-2","bypass-1-1","bypass-1-2",
+          "bypass-2-1","bypass-2-2","bypass-3","bypass-3-1",
+          "bypass-3-2","bypass-3-3","bypass-4-1","bypass-4-2",
+          "bypass-4-3","bypass-5","bypass-5-1","bypass-5-2",
+          "bypass-5-3","bypass-6-1","bypass-6-2","bypass-6-3",
+          "bypass-7-1","bypass-7-2","bypass-7-3","bypass-8-1",
+          "bypass-8-2","bypass-8-3","bypass-9-1","bypass-9-2",
+          "bypass-9-3","bypass-TEST-1","bypass-TEST-2",
+          "bypass-TEST-3","bypass-TEST-4"
+        ],
+        "strategy": {
+          "type": "leastLoad",
+          "settings": {
+            "maxRTT": "500ms",
+            "expected": 32,
+            "baselines": ["100ms","300ms"],
+            "tolerance": 0
+          }
+        },
+        "fallbackTag": "loopback-out"
+      }
+    ],
+    "domainMatcher": "hybrid",
+    "domainStrategy": "IPIfNonMatch"
   },
   "inbounds": [
     {
@@ -8333,7 +8333,7 @@
       },
       "sniffing": {
         "enabled": true,
-        "destOverride": ["http", "tls", "quic"]
+        "destOverride": ["http","tls","quic"]
       }
     },
     {
@@ -8345,13 +8345,22 @@
       },
       "sniffing": {
         "enabled": true,
-        "destOverride": ["http", "tls", "quic"]
+        "destOverride": ["http","tls","quic"]
+      }
+    },
+    {
+      "tag": "loopback-in",
+      "port": 10901,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "address": "127.0.0.1",
+        "network": "tcp,udp"
       }
     }
   ],
   "outbounds": [
     {
-      "tag": "proxy-0-1",
+      "tag": "bypass-0-1",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8377,7 +8386,7 @@
       }
     },
     {
-      "tag": "proxy-0-2",
+      "tag": "bypass-0-2",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8403,7 +8412,7 @@
       }
     },
     {
-      "tag": "proxy-1-1",
+      "tag": "bypass-1-1",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8429,7 +8438,7 @@
       }
     },
     {
-      "tag": "proxy-1-2",
+      "tag": "bypass-1-2",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8455,7 +8464,7 @@
       }
     },
     {
-      "tag": "proxy-2-1",
+      "tag": "bypass-2-1",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8481,7 +8490,7 @@
       }
     },
     {
-      "tag": "proxy-2-2",
+      "tag": "bypass-2-2",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8507,7 +8516,7 @@
       }
     },
     {
-      "tag": "proxy-3",
+      "tag": "bypass-3",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8533,7 +8542,7 @@
       }
     },
     {
-      "tag": "proxy-3-1",
+      "tag": "bypass-3-1",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8559,7 +8568,7 @@
       }
     },
     {
-      "tag": "proxy-3-2",
+      "tag": "bypass-3-2",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8585,7 +8594,7 @@
       }
     },
     {
-      "tag": "proxy-3-3",
+      "tag": "bypass-3-3",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8611,7 +8620,7 @@
       }
     },
     {
-      "tag": "proxy-4-1",
+      "tag": "bypass-4-1",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8637,7 +8646,7 @@
       }
     },
     {
-      "tag": "proxy-4-2",
+      "tag": "bypass-4-2",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8663,7 +8672,7 @@
       }
     },
     {
-      "tag": "proxy-4-3",
+      "tag": "bypass-4-3",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8689,7 +8698,7 @@
       }
     },
     {
-      "tag": "proxy-5",
+      "tag": "bypass-5",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8721,12 +8730,12 @@
         "tlsSettings": {
           "serverName": "fgwy.capybara.press",
           "fingerprint": "chrome",
-          "alpn": ["h3", "h2", "http/1.1"]
+          "alpn": ["h3","h2","http/1.1"]
         }
       }
     },
     {
-      "tag": "proxy-5-1",
+      "tag": "bypass-5-1",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8752,7 +8761,7 @@
       }
     },
     {
-      "tag": "proxy-5-2",
+      "tag": "bypass-5-2",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8778,7 +8787,7 @@
       }
     },
     {
-      "tag": "proxy-5-3",
+      "tag": "bypass-5-3",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8804,7 +8813,7 @@
       }
     },
     {
-      "tag": "proxy-6-1",
+      "tag": "bypass-6-1",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8830,7 +8839,7 @@
       }
     },
     {
-      "tag": "proxy-6-2",
+      "tag": "bypass-6-2",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8856,7 +8865,7 @@
       }
     },
     {
-      "tag": "proxy-6-3",
+      "tag": "bypass-6-3",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8882,7 +8891,7 @@
       }
     },
     {
-      "tag": "proxy-7-1",
+      "tag": "bypass-7-1",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8908,7 +8917,7 @@
       }
     },
     {
-      "tag": "proxy-7-2",
+      "tag": "bypass-7-2",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8934,7 +8943,7 @@
       }
     },
     {
-      "tag": "proxy-7-3",
+      "tag": "bypass-7-3",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8960,7 +8969,7 @@
       }
     },
     {
-      "tag": "proxy-8-1",
+      "tag": "bypass-8-1",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -8986,7 +8995,7 @@
       }
     },
     {
-      "tag": "proxy-8-2",
+      "tag": "bypass-8-2",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -9012,7 +9021,7 @@
       }
     },
     {
-      "tag": "proxy-8-3",
+      "tag": "bypass-8-3",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -9038,7 +9047,7 @@
       }
     },
     {
-      "tag": "proxy-9-1",
+      "tag": "bypass-9-1",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -9064,7 +9073,7 @@
       }
     },
     {
-      "tag": "proxy-9-2",
+      "tag": "bypass-9-2",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -9090,7 +9099,7 @@
       }
     },
     {
-      "tag": "proxy-9-3",
+      "tag": "bypass-9-3",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -9116,7 +9125,7 @@
       }
     },
     {
-      "tag": "proxy-TEST-1",
+      "tag": "bypass-TEST-1",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -9142,7 +9151,7 @@
       }
     },
     {
-      "tag": "proxy-TEST-2",
+      "tag": "bypass-TEST-2",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -9168,7 +9177,7 @@
       }
     },
     {
-      "tag": "proxy-TEST-3",
+      "tag": "bypass-TEST-3",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -9194,7 +9203,7 @@
       }
     },
     {
-      "tag": "proxy-TEST-4",
+      "tag": "bypass-TEST-4",
       "protocol": "vless",
       "settings": {
         "vnext": [{
@@ -9211,9 +9220,7 @@
         "network": "ws",
         "wsSettings": {
           "path": "/v1/data/sync/",
-          "headers": {
-            "Host": "s96705.cdn.ngenix.net"
-          },
+          "headers": {"Host": "s96705.cdn.ngenix.net"},
           "heartbeatPeriod": 20
         },
         "security": "tls",
@@ -9231,7 +9238,35 @@
     {
       "tag": "block",
       "protocol": "blackhole"
+    },
+    {
+      "tag": "loopback-out",
+      "protocol": "loopback",
+      "settings": {
+        "inboundTag": "loopback-in"
+      }
     }
-  ]
+  ],
+  "burstObservatory": {
+    "pingConfig": {
+      "timeout": "3s",
+      "interval": "120s",
+      "sampling": 1,
+      "destination": "http://www.gstatic.com/generate_204",
+      "connectivity": ""
+    },
+    "subjectSelector": [
+      "bypass-0-1","bypass-0-2","bypass-1-1","bypass-1-2",
+      "bypass-2-1","bypass-2-2","bypass-3","bypass-3-1",
+      "bypass-3-2","bypass-3-3","bypass-4-1","bypass-4-2",
+      "bypass-4-3","bypass-5","bypass-5-1","bypass-5-2",
+      "bypass-5-3","bypass-6-1","bypass-6-2","bypass-6-3",
+      "bypass-7-1","bypass-7-2","bypass-7-3","bypass-8-1",
+      "bypass-8-2","bypass-8-3","bypass-9-1","bypass-9-2",
+      "bypass-9-3","bypass-TEST-1","bypass-TEST-2",
+      "bypass-TEST-3","bypass-TEST-4"
+    ]
+  },
+  "remarks": "🇫🇲 ОБХОД LTE (автовыбор)"
 }
 ]
