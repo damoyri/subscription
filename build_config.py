@@ -5,7 +5,7 @@ import urllib.parse
 import subprocess
 import sys
 
-# ---------- ШАБЛОН ОДНОГО КОНФИГА (который будет добавлен в массив) ----------
+# ---------- ШАБЛОН КОНФИГА С БАЛАНСИРОВЩИКОМ ----------
 CONFIG_TEMPLATE = {
     "dns": {
         "servers": [
@@ -42,7 +42,7 @@ CONFIG_TEMPLATE = {
         "balancers": [
             {
                 "tag": "WL_Balancer",
-                "selector": [],  # будет заполнено тегами Игарька
+                "selector": [],  # заполнится тегами Игарька
                 "strategy": {
                     "type": "leastLoad",
                     "settings": {
@@ -63,13 +63,10 @@ CONFIG_TEMPLATE = {
             "sampling": 1,
             "destination": "http://www.gstatic.com/generate_204"
         },
-        "subjectSelector": []  # тоже заполним тегами Игарька
+        "subjectSelector": []  # тоже заполнится
     },
-    "outbounds": [
-        # сюда добавятся прокси Игарька
-        # потом direct и block
-    ],
-    "remarks": "🇫🇲 WL_Balancer (Игарек)"
+    "outbounds": [],  # сюда добавятся прокси, потом direct и block
+    "remarks": "🇫🇲 WL_Balancer (Игарек) [ПЕРВЫЙ]"
 }
 
 # ---------- ПАРСЕР VLESS-ССЫЛКИ ----------
@@ -136,13 +133,35 @@ def parse_vless_url(url):
 
 # ---------- ОСНОВНАЯ ФУНКЦИЯ ----------
 def main():
-    # Ссылки на подписки Игарька
+    # 1. Скачиваем платную подписку connliberty
+    print("Скачиваем платную подписку...")
+    try:
+        result = subprocess.run(
+            ['curl', '-sL', 'https://connliberty.com/connection/subs/22a12228-aa7d-4f34-a7cd-b617a8f61c20'],
+            capture_output=True, text=True, check=True
+        )
+        connliberty_data = result.stdout.strip()
+        # Пытаемся распарсить как JSON
+        try:
+            existing_configs = json.loads(connliberty_data)
+            if not isinstance(existing_configs, list):
+                print("Ошибка: платная подписка не является массивом, создаём пустой массив", file=sys.stderr)
+                existing_configs = []
+        except json.JSONDecodeError:
+            print("Ошибка: платная подписка не является валидным JSON, создаём пустой массив", file=sys.stderr)
+            existing_configs = []
+    except Exception as e:
+        print(f"Ошибка загрузки платной подписки: {e}", file=sys.stderr)
+        existing_configs = []
+
+    print(f"Загружено {len(existing_configs)} конфигов из платной подписки")
+
+    # 2. Скачиваем подписки Игарька и собираем VLESS-ссылки
     igareck_urls = [
         "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt",
         "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt"
     ]
 
-    # Собираем ссылки Игарька
     igareck_links = []
     for url in igareck_urls:
         try:
@@ -154,14 +173,13 @@ def main():
         except Exception as e:
             print(f"Ошибка загрузки {url}: {e}", file=sys.stderr)
 
-    print(f"Найдено {len(igareck_links)} ссылок Игарька")
-
-    # Если нет ссылок – выходим
     if not igareck_links:
-        print("Нет ссылок Игарька, конфиг не создан", file=sys.stderr)
+        print("Нет ссылок Игарька, выходим", file=sys.stderr)
         sys.exit(1)
 
-    # Создаём outbounds для каждой ссылки Игарька
+    print(f"Найдено {len(igareck_links)} ссылок Игарька")
+
+    # 3. Создаём outbounds из ссылок Игарька
     outbounds = []
     igareck_tags = []
     for idx, link in enumerate(igareck_links):
@@ -185,30 +203,21 @@ def main():
         "tag": "block"
     })
 
-    # Создаём один конфиг
+    # 4. Формируем новый конфиг с балансировщиком
     new_config = CONFIG_TEMPLATE.copy()
     new_config['outbounds'] = outbounds
     new_config['routing']['balancers'][0]['selector'] = igareck_tags
     new_config['burstObservatory']['subjectSelector'] = igareck_tags
 
-    # ----- ЧИТАЕМ СУЩЕСТВУЮЩИЙ subscription.json (МАССИВ) -----
-    try:
-        with open('subscription.json', 'r', encoding='utf-8') as f:
-            existing = json.load(f)
-        if not isinstance(existing, list):
-            print("subscription.json не является массивом, создаём новый", file=sys.stderr)
-            existing = []
-    except (FileNotFoundError, json.JSONDecodeError):
-        existing = []
+    # 5. Вставляем новый конфиг в начало массива
+    final_configs = [new_config] + existing_configs
 
-    # Добавляем новый конфиг в конец массива
-    existing.append(new_config)
-
-    # Сохраняем обратно
+    # 6. Сохраняем в subscription.json
     with open('subscription.json', 'w', encoding='utf-8') as f:
-        json.dump(existing, f, indent=2, ensure_ascii=False)
+        json.dump(final_configs, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Добавлен конфиг с балансировщиком из {len(igareck_tags)} серверов Игарька")
+    print(f"✅ Добавлен конфиг с балансировщиком (первый в списке) из {len(igareck_tags)} серверов Игарька")
+    print(f"Всего конфигов в файле: {len(final_configs)}")
 
 if __name__ == '__main__':
     main()
