@@ -1,0 +1,26 @@
+name: Update subscription from connliberty
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # каждые 6 часов
+  workflow_dispatch:         # можно запускать вручную
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # разрешаем коммитить изменения
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download subscription
+        run: |
+          curl -L https://connliberty.com/connection/subs/22a12228-aa7d-4f34-a7cd-b617a8f61c20 -o subscription.json
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add subscription.json
+          git commit -m "Auto-update subscription" || echo "No changes"
+          git push
