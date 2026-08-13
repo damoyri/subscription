@@ -1,26 +1,30 @@
-name: Update subscription from connliberty
+name: Build Config with Balancer
 
 on:
   schedule:
-    - cron: '0 */6 * * *'   # каждые 6 часов
-  workflow_dispatch:         # можно запускать вручную
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 jobs:
-  update:
+  build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write        # разрешаем коммитить изменения
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download subscription
+      - name: Install dependencies
         run: |
-          curl -L https://connliberty.com/connection/subs/22a12228-aa7d-4f34-a7cd-b617a8f61c20 -o subscription.json
+          sudo apt-get update
+          sudo apt-get install -y curl jq
 
-      - name: Commit and push if changed
+      - name: Run config builder
+        run: python3 build_config.py
+
+      - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add subscription.json
-          git commit -m "Auto-update subscription" || echo "No changes"
+          git commit -m "Auto-build config: WL_Balancer only for igareck" || echo "No changes"
           git push
