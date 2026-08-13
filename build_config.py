@@ -2,73 +2,74 @@
 import re
 import json
 import urllib.parse
-import sys
 import subprocess
+import sys
 
-# ---------- ШАБЛОН КОНФИГА ----------
-TEMPLATE = {
-  "dns": {
-    "servers": [
-      "https://8.8.8.8/dns-query",
-      "https://8.8.4.4/dns-query"
-    ],
-    "queryStrategy": "UseIP"
-  },
-  "log": {"loglevel": "warning"},
-  "inbounds": [
-    {
-      "listen": "127.0.0.1",
-      "port": 10808,
-      "protocol": "socks",
-      "settings": {"auth": "noauth", "udp": True, "userLevel": 8},
-      "sniffing": {"destOverride": ["http", "tls"], "enabled": True, "routeOnly": False},
-      "tag": "socks"
+# ---------- ШАБЛОН ОДНОГО КОНФИГА (который будет добавлен в массив) ----------
+CONFIG_TEMPLATE = {
+    "dns": {
+        "servers": [
+            "https://8.8.8.8/dns-query",
+            "https://8.8.4.4/dns-query"
+        ],
+        "queryStrategy": "UseIP"
     },
-    {
-      "listen": "127.0.0.1",
-      "port": 10809,
-      "protocol": "http",
-      "settings": {"userLevel": 8},
-      "tag": "http"
-    }
-  ],
-  "routing": {
-    "domainStrategy": "IPIfNonMatch",
-    "domainMatcher": "hybrid",
-    "rules": [
-      {"type": "field", "protocol": ["bittorrent"], "outboundTag": "direct"},
-      {"type": "field", "network": "tcp,udp", "balancerTag": "WL_Balancer"}
-    ],
-    "balancers": [
-      {
-        "tag": "WL_Balancer",
-        "selector": [],   # заполним тегами Игарька
-        "strategy": {
-          "type": "leastLoad",
-          "settings": {
-            "maxRTT": "5s",
-            "expected": 1,
-            "baselines": ["500ms", "1000ms"],
-            "tolerance": 0
-          }
+    "log": {"loglevel": "warning"},
+    "inbounds": [
+        {
+            "listen": "127.0.0.1",
+            "port": 10808,
+            "protocol": "socks",
+            "settings": {"auth": "noauth", "udp": True, "userLevel": 8},
+            "sniffing": {"destOverride": ["http", "tls"], "enabled": True, "routeOnly": False},
+            "tag": "socks"
         },
-        "fallbackTag": "direct"
-      }
-    ]
-  },
-  "burstObservatory": {
-    "pingConfig": {
-      "timeout": "7s",
-      "interval": "5m",
-      "sampling": 1,
-      "destination": "http://www.gstatic.com/generate_204"
+        {
+            "listen": "127.0.0.1",
+            "port": 10809,
+            "protocol": "http",
+            "settings": {"userLevel": 8},
+            "tag": "http"
+        }
+    ],
+    "routing": {
+        "domainStrategy": "IPIfNonMatch",
+        "domainMatcher": "hybrid",
+        "rules": [
+            {"type": "field", "protocol": ["bittorrent"], "outboundTag": "direct"},
+            {"type": "field", "network": "tcp,udp", "balancerTag": "WL_Balancer"}
+        ],
+        "balancers": [
+            {
+                "tag": "WL_Balancer",
+                "selector": [],  # будет заполнено тегами Игарька
+                "strategy": {
+                    "type": "leastLoad",
+                    "settings": {
+                        "maxRTT": "5s",
+                        "expected": 1,
+                        "baselines": ["500ms", "1000ms"],
+                        "tolerance": 0
+                    }
+                },
+                "fallbackTag": "direct"
+            }
+        ]
     },
-    "subjectSelector": []   # тоже заполним тегами Игарька
-  },
-  "outbounds": [
-    # сюда будут добавлены прокси, потом direct и block
-  ],
-  "remarks": "🚀 WL_Balancer (Игарек) + остальные outbound'ы"
+    "burstObservatory": {
+        "pingConfig": {
+            "timeout": "7s",
+            "interval": "5m",
+            "sampling": 1,
+            "destination": "http://www.gstatic.com/generate_204"
+        },
+        "subjectSelector": []  # тоже заполним тегами Игарька
+    },
+    "outbounds": [
+        # сюда добавятся прокси Игарька
+        # потом direct и block
+    ],
+    "remarks": "🇫🇲 WL_Balancer (Игарек)"
 }
 
 # ---------- ПАРСЕР VLESS-ССЫЛКИ ----------
@@ -135,37 +136,34 @@ def parse_vless_url(url):
 
 # ---------- ОСНОВНАЯ ФУНКЦИЯ ----------
 def main():
-    # Ссылки на подписки
+    # Ссылки на подписки Игарька
     igareck_urls = [
         "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt",
         "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt"
     ]
-    connliberty_url = "https://connliberty.com/connection/subs/22a12228-aa7d-4f34-a7cd-b617a8f61c20"
 
-    # Сбор ссылок
-    def fetch_links(urls):
-        links = []
-        for url in urls:
-            try:
-                result = subprocess.run(['curl', '-sL', url], capture_output=True, text=True, check=True)
-                for line in result.stdout.splitlines():
-                    line = line.strip()
-                    if line.startswith('vless://'):
-                        links.append(line)
-            except Exception as e:
-                print(f"Ошибка загрузки {url}: {e}", file=sys.stderr)
-        return links
+    # Собираем ссылки Игарька
+    igareck_links = []
+    for url in igareck_urls:
+        try:
+            result = subprocess.run(['curl', '-sL', url], capture_output=True, text=True, check=True)
+            for line in result.stdout.splitlines():
+                line = line.strip()
+                if line.startswith('vless://'):
+                    igareck_links.append(line)
+        except Exception as e:
+            print(f"Ошибка загрузки {url}: {e}", file=sys.stderr)
 
-    igareck_links = fetch_links(igareck_urls)
-    connliberty_links = fetch_links([connliberty_url])
+    print(f"Найдено {len(igareck_links)} ссылок Игарька")
 
-    print(f"Найдено {len(igareck_links)} ссылок Игарька, {len(connliberty_links)} ссылок connliberty")
+    # Если нет ссылок – выходим
+    if not igareck_links:
+        print("Нет ссылок Игарька, конфиг не создан", file=sys.stderr)
+        sys.exit(1)
 
-    # ----- Генерируем outbounds -----
+    # Создаём outbounds для каждой ссылки Игарька
     outbounds = []
     igareck_tags = []
-
-    # 1) Игарек – с тегами proxy-ig-*
     for idx, link in enumerate(igareck_links):
         ob = parse_vless_url(link)
         if ob is None:
@@ -175,17 +173,7 @@ def main():
         outbounds.append(ob)
         igareck_tags.append(tag)
 
-    # 2) Connliberty – с тегами proxy-cl-*
-    for idx, link in enumerate(connliberty_links):
-        ob = parse_vless_url(link)
-        if ob is None:
-            continue
-        tag = f"proxy-cl-{idx+1}"
-        ob['tag'] = tag
-        outbounds.append(ob)
-        # не добавляем в балансировщик
-
-    # 3) Добавляем direct и block (в конце)
+    # Добавляем direct и block
     outbounds.append({
         "protocol": "freedom",
         "settings": {"domainStrategy": "UseIP"},
@@ -197,25 +185,30 @@ def main():
         "tag": "block"
     })
 
-    # ----- Собираем итоговый конфиг -----
-    config = TEMPLATE.copy()
-    config['outbounds'] = outbounds
+    # Создаём один конфиг
+    new_config = CONFIG_TEMPLATE.copy()
+    new_config['outbounds'] = outbounds
+    new_config['routing']['balancers'][0]['selector'] = igareck_tags
+    new_config['burstObservatory']['subjectSelector'] = igareck_tags
 
-    # Обновляем балансировщик – селектор только из igareck_tags
-    if igareck_tags:
-        config['routing']['balancers'][0]['selector'] = igareck_tags
-        config['burstObservatory']['subjectSelector'] = igareck_tags
-    else:
-        # Если нет серверов Игарька, балансировщик будет использовать direct
-        config['routing']['balancers'][0]['selector'] = ['direct']
-        config['routing']['balancers'][0]['fallbackTag'] = 'direct'
-        config['burstObservatory']['subjectSelector'] = ['direct']
+    # ----- ЧИТАЕМ СУЩЕСТВУЮЩИЙ subscription.json (МАССИВ) -----
+    try:
+        with open('subscription.json', 'r', encoding='utf-8') as f:
+            existing = json.load(f)
+        if not isinstance(existing, list):
+            print("subscription.json не является массивом, создаём новый", file=sys.stderr)
+            existing = []
+    except (FileNotFoundError, json.JSONDecodeError):
+        existing = []
 
-    # Сохраняем
-    with open('subscription.json', 'w') as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
+    # Добавляем новый конфиг в конец массива
+    existing.append(new_config)
 
-    print("Конфиг успешно создан. WL_Balancer содержит только сервера Игарька.")
+    # Сохраняем обратно
+    with open('subscription.json', 'w', encoding='utf-8') as f:
+        json.dump(existing, f, indent=2, ensure_ascii=False)
+
+    print(f"✅ Добавлен конфиг с балансировщиком из {len(igareck_tags)} серверов Игарька")
 
 if __name__ == '__main__':
     main()
