@@ -5,6 +5,20 @@ import urllib.parse
 import subprocess
 import sys
 
+# ---------- ДОПУСТИМЫЕ ЗНАЧЕНИЯ FINGERPRINT ----------
+VALID_FINGERPRINTS = ['chrome', 'firefox', 'edge', 'safari', 'ios', 'android', 'qq', 'random']
+
+def clean_fingerprint(fp):
+    """Очищает fingerprint: если невалидный, возвращает 'chrome'"""
+    if not fp:
+        return 'chrome'
+    # Приводим к нижнему регистру и убираем всё после '#', ' ', '|' и т.п.
+    cleaned = re.sub(r'[#|*].*', '', fp).strip().lower()
+    # Если очищенное значение есть в списке допустимых, возвращаем его, иначе 'chrome'
+    if cleaned in VALID_FINGERPRINTS:
+        return cleaned
+    return 'chrome'
+
 # ---------- ШАБЛОН КОНФИГА С БАЛАНСИРОВЩИКОМ ----------
 CONFIG_TEMPLATE = {
     "dns": {
@@ -66,7 +80,7 @@ CONFIG_TEMPLATE = {
         "subjectSelector": []  # тоже заполнится
     },
     "outbounds": [],  # сюда добавятся прокси, потом direct и block
-    "remarks": "🇫🇲 WL_Balancer (Игарек) [ПЕРВЫЙ]"
+    "remarks": "🇫🇲 АВТООБХОД Igareck"
 }
 
 # ---------- ПАРСЕР VLESS-ССЫЛКИ ----------
@@ -93,6 +107,10 @@ def parse_vless_url(url):
     for k, v in params.items():
         params[k] = v[0] if v else ''
 
+    # Обработка fingerprint
+    fp_raw = params.get('fp') or params.get('fingerprint', 'firefox')
+    fingerprint = clean_fingerprint(fp_raw)
+
     outbound = {
         "tag": None,
         "protocol": "vless",
@@ -117,7 +135,7 @@ def parse_vless_url(url):
     if outbound["streamSettings"]["security"] == "reality":
         outbound["streamSettings"]["realitySettings"] = {
             "allowInsecure": False,
-            "fingerprint": params.get('fp', 'firefox'),
+            "fingerprint": fingerprint,
             "publicKey": params.get('pbk', '') or params.get('publicKey', ''),
             "serverName": params.get('sni', address),
             "shortId": params.get('sid', ''),
@@ -127,7 +145,7 @@ def parse_vless_url(url):
         outbound["streamSettings"]["tlsSettings"] = {
             "allowInsecure": False,
             "serverName": params.get('sni', address),
-            "fingerprint": params.get('fp', 'firefox')
+            "fingerprint": fingerprint
         }
     return outbound
 
@@ -141,7 +159,6 @@ def main():
             capture_output=True, text=True, check=True
         )
         connliberty_data = result.stdout.strip()
-        # Пытаемся распарсить как JSON
         try:
             existing_configs = json.loads(connliberty_data)
             if not isinstance(existing_configs, list):
