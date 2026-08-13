@@ -26,5 +26,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add subscription.json
-          git commit -m "Auto-build config: WL_Balancer only for igareck" || echo "No changes"
+          git commit -m "Add WL_Balancer config (first) + update paid subscription" || echo "No changes"
           git push
