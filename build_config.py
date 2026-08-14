@@ -210,7 +210,7 @@ def main():
                 old_file_data = json.load(f)
                 if isinstance(old_file_data, list):
                     # Исключаем все ранее сгенерированные балансировщики (по эмодзи и старому названию)
-                    exclude_prefixes = ('🏳️list', '🏴', '🇫🇲 АБС')
+                    exclude_prefixes = ('🏳️list', '🏴list')
                     existing_configs = [
                         c for c in old_file_data 
                         if isinstance(c, dict) and not c.get('remarks', '').startswith(exclude_prefixes)
@@ -304,7 +304,7 @@ def main():
     config_wl_noru['burstObservatory']['subjectSelector'] = wl_tags_noru
 
     # 3. Черный список
-    config_bl = create_config_template("🏴 blacklist [LTE]")
+    config_bl = create_config_template("🏴list [wifi]")
     # Проверка на случай, если черный список пуст
     if bl_outbounds:
         config_bl['outbounds'] = bl_outbounds + direct_block
