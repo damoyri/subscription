@@ -18,7 +18,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y curl jq
 
-      # ----- Установка sing-box (обязательно!) -----
       - name: Install sing-box
         run: |
           curl -sL -o sing-box.tar.gz \
@@ -32,7 +31,6 @@ jobs:
       - name: Pull latest changes (avoid conflicts)
         run: git pull --rebase origin main || echo "No upstream changes"
 
-      # ----- Передаём секрет в окружение -----
       - name: Run config builder
         env:
           PAID_SUB_URL: ${{ secrets.PAID_SUB_URL }}
@@ -42,22 +40,23 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # --ignore-errors — не падаем, если файл отсутствует
           git add --ignore-errors subscription.json subscription.txt sub2.txt sub2.json
           git commit -m "Update subscription files" || echo "No changes to commit"
           git pull --rebase origin main || echo "Rebase done"
           git push origin main
 
-      # ----- Безопасный пуш в Bitbucket -----
       - name: Push to Bitbucket (SSH)
-        if: ${{ secrets.BITBUCKET_SSH_PRIVATE_KEY != '' }}
+        env:
+          BITBUCKET_SSH_PRIVATE_KEY: ${{ secrets.BITBUCKET_SSH_PRIVATE_KEY }}
         run: |
+          if [ -z "$BITBUCKET_SSH_PRIVATE_KEY" ]; then
+            echo "Bitbucket SSH key not set, skipping"
+            exit 0
+          fi
           mkdir -p ~/.ssh
-          echo "${{ secrets.BITBUCKET_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "$BITBUCKET_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
-          # Добавляем remote только если его нет
           git remote get-url bitbucket || git remote add bitbucket git@bitbucket.org:damoyri/subscription.git
-          # Вместо --force используем обычный push (или оставьте --force, если уверены)
           git push --all bitbucket
           git push --tags bitbucket
