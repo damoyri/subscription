@@ -20,15 +20,36 @@ jobs:
 
       - name: Install sing-box
         run: |
-          # Скачиваем с правильным заголовком Accept
-          curl -L -H "Accept: application/octet-stream" -o sing-box.tar.gz \
-            https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-linux-amd64.tar.gz
-          # Проверяем, что файл не пустой
-          if [ ! -s sing-box.tar.gz ]; then
-            echo "Download failed or empty file"
+          # Получаем информацию о последнем релизе через API
+          RELEASE_JSON=$(curl -s -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/SagerNet/sing-box/releases/latest)
+          
+          # Извлекаем URL для linux-amd64 архива
+          DOWNLOAD_URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name | contains("linux-amd64") and endswith(".tar.gz")) | .browser_download_url')
+          
+          # Если по какой-то причине URL не найден, пытаемся получить через прямой запрос с версией
+          if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ]; then
+            echo "Could not find asset via API, trying fallback..."
+            VERSION=$(echo "$RELEASE_JSON" | jq -r '.tag_name')
+            if [ -n "$VERSION" ] && [ "$VERSION" != "null" ]; then
+              DOWNLOAD_URL="https://github.com/SagerNet/sing-box/releases/download/${VERSION}/sing-box-linux-amd64.tar.gz"
+            else
+              echo "Failed to determine version"
+              exit 1
+            fi
+          fi
+          
+          echo "Downloading from: $DOWNLOAD_URL"
+          curl -L -H "Accept: application/octet-stream" -H "User-Agent: curl" -o sing-box.tar.gz "$DOWNLOAD_URL"
+          
+          # Проверяем размер файла (должен быть больше 1 МБ)
+          if [ $(stat -c%s "sing-box.tar.gz") -lt 1000000 ]; then
+            echo "Downloaded file too small, likely HTML error"
+            cat sing-box.tar.gz   # выводим содержимое для диагностики
             exit 1
           fi
-          # Распаковываем и перемещаем бинарник
+          
+          # Распаковываем
           tar -xzf sing-box.tar.gz --strip-components=1 -C /tmp $(tar -tzf sing-box.tar.gz | grep '/sing-box$')
           sudo mv /tmp/sing-box /usr/local/bin/sing-box
           sudo chmod +x /usr/local/bin/sing-box
