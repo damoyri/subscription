@@ -188,6 +188,150 @@ def get_vless_links(urls_list):
     return list(dict.fromkeys(all_links))
 
 
+# ----- Функции для обратного преобразования outbound → ссылка -----
+def generate_vless_url(outbound, remarks=None):
+    """Генерирует VLESS URL из outbound-объекта."""
+    try:
+        settings = outbound['settings']
+        vnext = settings['vnext'][0]
+        address = vnext['address']
+        port = vnext['port']
+        user = vnext['users'][0]
+        user_id = user['id']
+        encryption = user.get('encryption', 'none')
+        flow = user.get('flow', '')
+
+        stream = outbound.get('streamSettings', {})
+        network = stream.get('network', 'tcp')
+        security = stream.get('security', '')
+
+        params = {}
+        params['encryption'] = encryption
+        if flow:
+            params['flow'] = flow
+        if security:
+            params['security'] = security
+        if network != 'tcp':
+            params['type'] = network
+
+        # reality / tls
+        if security == 'reality':
+            reality = stream.get('realitySettings', {})
+            if 'serverName' in reality:
+                params['sni'] = reality['serverName']
+            if 'fingerprint' in reality:
+                params['fp'] = reality['fingerprint']
+            if 'publicKey' in reality:
+                params['pbk'] = reality['publicKey']
+            if 'shortId' in reality:
+                params['sid'] = reality['shortId']
+        elif security == 'tls':
+            tls = stream.get('tlsSettings', {})
+            if 'serverName' in tls:
+                params['sni'] = tls['serverName']
+            if 'fingerprint' in tls:
+                params['fp'] = tls['fingerprint']
+
+        # Прочие параметры из streamSettings (не вложенные)
+        for key, value in stream.items():
+            if key not in ['network', 'security', 'realitySettings', 'tlsSettings',
+                           'tcpSettings', 'wsSettings', 'grpcSettings', 'httpSettings', 'xhttpSettings']:
+                if isinstance(value, (str, int, bool)):
+                    params[key] = str(value).lower() if isinstance(value, bool) else str(value)
+
+        # Специфика для ws, grpc, xhttp
+        if network == 'ws':
+            ws = stream.get('wsSettings', {})
+            if 'path' in ws:
+                params['path'] = ws['path']
+            if 'headers' in ws and isinstance(ws['headers'], dict):
+                if 'Host' in ws['headers']:
+                    params['host'] = ws['headers']['Host']
+        elif network == 'grpc':
+            grpc = stream.get('grpcSettings', {})
+            if 'serviceName' in grpc:
+                params['serviceName'] = grpc['serviceName']
+        elif network == 'xhttp':
+            xhttp = stream.get('xhttpSettings', {})
+            if 'path' in xhttp:
+                params['path'] = xhttp['path']
+            if 'host' in xhttp:
+                params['host'] = xhttp['host']
+            if 'mode' in xhttp:
+                params['mode'] = xhttp['mode']
+
+        # Сборка URL
+        base = f"vless://{user_id}@{address}:{port}"
+        if params:
+            query = '&'.join([f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items() if v])
+            base += '?' + query
+        if remarks:
+            base += '#' + urllib.parse.quote(remarks)
+        return base
+    except Exception:
+        return None
+
+
+def generate_hysteria2_url(outbound, remarks=None):
+    """Генерирует Hysteria2 URL из outbound-объекта."""
+    try:
+        settings = outbound['settings']
+        # Поддерживаем два возможных формата: {servers: [...]} или прямо {address, port, ...}
+        if 'servers' in settings and settings['servers']:
+            server = settings['servers'][0]
+            address = server.get('address')
+            port = server.get('port')
+            auth = server.get('auth') or server.get('password') or settings.get('auth')
+        else:
+            address = settings.get('address')
+            port = settings.get('port')
+            auth = settings.get('auth') or settings.get('password') or settings.get('id')
+        if not address or not port or not auth:
+            return None
+
+        params = {}
+        # Извлекаем sni, fingerprint, alpn, insecure
+        for key in ['sni', 'fingerprint', 'insecure']:
+            val = settings.get(key)
+            if val is None and 'servers' in settings:
+                val = server.get(key)
+            if val is not None:
+                if key == 'insecure':
+                    params['insecure'] = '1' if val else '0'
+                else:
+                    params[key] = str(val)
+
+        # alpn может быть списком
+        alpn = settings.get('alpn')
+        if alpn is None and 'servers' in settings:
+            alpn = server.get('alpn')
+        if alpn:
+            if isinstance(alpn, list):
+                alpn = ','.join(alpn)
+            params['alpn'] = alpn
+
+        base = f"hysteria2://{auth}@{address}:{port}"
+        if params:
+            query = '&'.join([f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items() if v])
+            base += '?' + query
+        if remarks:
+            base += '#' + urllib.parse.quote(remarks)
+        return base
+    except Exception:
+        return None
+
+
+def generate_link(outbound, remarks=None):
+    """Универсальная функция: генерирует ссылку для поддерживаемых протоколов."""
+    protocol = outbound.get('protocol')
+    if protocol == 'vless':
+        return generate_vless_url(outbound, remarks)
+    elif protocol == 'hysteria2':
+        return generate_hysteria2_url(outbound, remarks)
+    else:
+        return None
+
+
 def main():
     print("📥 Загрузка платной подписки...")
     paid_sub_url = 'https://connliberty.com/connection/subs/22a12228-aa7d-4f34-a7cd-b617a8f61c20'
@@ -305,7 +449,6 @@ def main():
 
     # 3. Черный список
     config_bl = create_config_template("🏴list [wifi]")
-    # Проверка на случай, если черный список пуст
     if bl_outbounds:
         config_bl['outbounds'] = bl_outbounds + direct_block
         config_bl['routing']['balancers'][0]['selector'] = bl_tags
@@ -320,16 +463,39 @@ def main():
     with open('subscription.json', 'w', encoding='utf-8') as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
 
-    # ДОБАВЛЕНО: Сохранение в subscription.txt (такой же JSON, но в текстовом файле)
+    # Сохранение в subscription.txt (такой же JSON, но в текстовом файле)
     with open('subscription.txt', 'w', encoding='utf-8') as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
+
+    # ==========================
+    # ГЕНЕРАЦИЯ ССЫЛОК ДЛЯ KARING (из платной подписки)
+    # ==========================
+    all_links = []
+    for cfg in existing_configs:
+        remarks = cfg.get('remarks', '')
+        for ob in cfg.get('outbounds', []):
+            link = generate_link(ob, remarks)
+            if link:
+                all_links.append(link)
+
+    # Удаляем дубликаты
+    all_links = list(dict.fromkeys(all_links))
+
+    # Сохраняем в sub2.txt (построчно)
+    with open('sub2.txt', 'w', encoding='utf-8') as f:
+        f.write('\n'.join(all_links))
+
+    # Сохраняем в sub2.json (массив ссылок)
+    with open('sub2.json', 'w', encoding='utf-8') as f:
+        json.dump(all_links, f, indent=2, ensure_ascii=False)
 
     print("\n✅ Успешно обновлено!")
     print(f"   • Серверов в белом списке (Все): {len(wl_tags_all)}")
     print(f"   • Серверов в белом списке (NoRU/BY): {len(wl_tags_noru)}")
     print(f"   • Серверов в черном списке: {len(bl_tags)}")
     print(f"   • Всего записей в файле подписки: {len(final_configs)}")
-    print("   • Результат сохранён в subscription.json и subscription.txt")
+    print(f"   • Ссылок для Karing из платной подписки: {len(all_links)}")
+    print("   • Результат сохранён в subscription.json, subscription.txt, sub2.txt, sub2.json")
 
 
 if __name__ == '__main__':
