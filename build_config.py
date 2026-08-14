@@ -4,6 +4,7 @@ import re
 import subprocess
 import sys
 import urllib.parse
+import base64  # добавлено для декодирования
 
 VALID_FINGERPRINTS = ['chrome', 'firefox', 'edge', 'safari', 'ios', 'android', 'qq', 'random']
 EXCLUDE_PATTERN = re.compile(r'(Россия|anycast|Беларусь|🇷🇺|🇧🇾|Russia|Belarus)', re.IGNORECASE)
@@ -192,24 +193,78 @@ def main():
     print("📥 Загрузка платной подписки...")
     paid_sub_url = 'https://vlv.one/h7n0gvdjvv'
     paid_sub_raw = fetch_url(paid_sub_url)
-    existing_configs = []
+    existing_configs = []  # теперь заполняем по-новому
 
     if paid_sub_raw:
+        # 1) Пытаемся парсить JSON
         try:
             parsed_json = json.loads(paid_sub_raw)
             if isinstance(parsed_json, list):
                 existing_configs = parsed_json
+                print(f"✅ Загружено {len(existing_configs)} платных конфигов (JSON)")
         except json.JSONDecodeError:
-            print("⚠️ Ошибка парсинга JSON платной подписки", file=sys.stderr)
+            # 2) Не JSON – пробуем как base64 или просто текст
+            print("⚠️ Ответ не JSON, пробуем как base64 или список VLESS-ссылок")
+            decoded_text = None
 
-    # ЗАЩИТА: Восстановление старых конфигов
+            # Проверяем, похоже ли на base64 (только латиница, цифры, +, /, =)
+            if re.fullmatch(r'^[A-Za-z0-9+/=]+$', paid_sub_raw.strip()):
+                try:
+                    decoded_bytes = base64.b64decode(paid_sub_raw)
+                    decoded_text = decoded_bytes.decode('utf-8', errors='ignore')
+                    print("🔓 Успешно декодировано из base64")
+                except Exception as e:
+                    print(f"⚠️ Ошибка декодирования base64: {e}")
+
+            # Если декодировали – используем полученный текст, иначе исходный
+            content_to_parse = decoded_text if decoded_text else paid_sub_raw
+
+            # Разбиваем на строки и собираем VLESS-ссылки
+            paid_links = []
+            for line in content_to_parse.splitlines():
+                line = line.strip()
+                if line.startswith('vless://'):
+                    paid_links.append(line)
+
+            if paid_links:
+                print(f"🔗 Найдено {len(paid_links)} VLESS-ссылок в платной подписке")
+                # Парсим каждую ссылку в outbound
+                paid_outbounds = []
+                paid_tags = []
+                for idx, link in enumerate(paid_links, start=1):
+                    ob, rem = parse_vless_url(link)
+                    if ob is not None:
+                        tag = f"paid-{idx}"
+                        ob['tag'] = tag
+                        paid_outbounds.append(ob)
+                        paid_tags.append(tag)
+                        print(f"   ✅ Сервер {idx}: {rem or 'без названия'}")
+                if paid_outbounds:
+                    # Создаём один конфиг для платных серверов с балансировщиком
+                    config_paid = create_config_template("🛡️ Paid Subscription")
+                    direct_block = [
+                        {"protocol": "freedom", "settings": {"domainStrategy": "UseIP"}, "tag": "direct"},
+                        {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"}
+                    ]
+                    config_paid['outbounds'] = paid_outbounds + direct_block
+                    config_paid['routing']['balancers'][0]['selector'] = paid_tags
+                    config_paid['burstObservatory']['subjectSelector'] = paid_tags
+                    existing_configs = [config_paid]
+                    print(f"✅ Создан платный конфиг с {len(paid_outbounds)} серверами")
+                else:
+                    print("⚠️ Не удалось распарсить ни одной VLESS-ссылки")
+            else:
+                print("⚠️ В ответе не найдено VLESS-ссылок")
+    else:
+        print("⚠️ Не удалось загрузить платную подписку по сети")
+
+    # Если платные конфиги всё ещё пустые – пробуем восстановить из старого файла
     if not existing_configs:
-        print("⚠️ Не удалось загрузить платную подписку по сети. Пробуем восстановить из прошлых данных...")
+        print("⚠️ Платные конфиги не получены. Пробуем восстановить из прошлых данных...")
         try:
             with open('subscription.json', 'r', encoding='utf-8') as f:
                 old_file_data = json.load(f)
                 if isinstance(old_file_data, list):
-                    # Исключаем все ранее сгенерированные балансировщики (по эмодзи и старому названию)
                     exclude_prefixes = ('🏳️list', '🏴list')
                     existing_configs = [
                         c for c in old_file_data 
@@ -305,7 +360,6 @@ def main():
 
     # 3. Черный список
     config_bl = create_config_template("🏴list [wifi]")
-    # Проверка на случай, если черный список пуст
     if bl_outbounds:
         config_bl['outbounds'] = bl_outbounds + direct_block
         config_bl['routing']['balancers'][0]['selector'] = bl_tags
@@ -320,7 +374,7 @@ def main():
     with open('subscription.json', 'w', encoding='utf-8') as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
 
-    # ДОБАВЛЕНО: Сохранение в subscription.txt (такой же JSON, но в текстовом файле)
+    # Сохранение в subscription.txt
     with open('subscription.txt', 'w', encoding='utf-8') as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
 
