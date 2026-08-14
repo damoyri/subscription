@@ -20,10 +20,13 @@ jobs:
 
       - name: Install sing-box
         run: |
-          curl -sL -o sing-box.tar.gz \
-            https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-linux-amd64.tar.gz
-          tar -xzf sing-box.tar.gz --strip-components=1 -C /tmp \
-            $(tar -tzf sing-box.tar.gz | grep '/sing-box$')
+          LATEST_URL=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | jq -r '.assets[] | select(.name | contains("linux-amd64")) | .browser_download_url')
+          if [ -z "$LATEST_URL" ]; then
+            echo "Failed to get latest sing-box download URL"
+            exit 1
+          fi
+          curl -sL -o sing-box.tar.gz "$LATEST_URL"
+          tar -xzf sing-box.tar.gz --strip-components=1 -C /tmp $(tar -tzf sing-box.tar.gz | grep '/sing-box$')
           sudo mv /tmp/sing-box /usr/local/bin/sing-box
           sudo chmod +x /usr/local/bin/sing-box
           sing-box version
