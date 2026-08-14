@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
       - uses: actions/checkout@v4
 
@@ -21,13 +20,6 @@ jobs:
 
       - name: Pull latest changes (avoid conflicts)
         run: git pull --rebase origin main || echo "No upstream changes"
-
-      # ===== ОТЛАДКА: проверяем, что приходит по ссылке платной подписки =====
-      - name: Debug - check paid subscription URL
-        run: |
-          echo "=== Проверяем ссылку ==="
-          curl -sL -w '\nHTTP код: %{http_code}\n' https://vlv.one/h7n0gvdjvv | head -c 500
-          echo -e "\n=== Конец отладки ==="
 
       - name: Run config builder
         run: python3 build_config.py
