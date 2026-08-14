@@ -316,7 +316,12 @@ def main():
     # Объединяем все сгенерированные балансировщики и платные конфиги
     final_configs = [config_wl_all, config_wl_noru, config_bl] + existing_configs
 
+    # Сохранение в subscription.json
     with open('subscription.json', 'w', encoding='utf-8') as f:
+        json.dump(final_configs, f, indent=2, ensure_ascii=False)
+
+    # ДОБАВЛЕНО: Сохранение в subscription.txt (такой же JSON, но в текстовом файле)
+    with open('subscription.txt', 'w', encoding='utf-8') as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
 
     print("\n✅ Успешно обновлено!")
@@ -324,6 +329,7 @@ def main():
     print(f"   • Серверов в белом списке (NoRU/BY): {len(wl_tags_noru)}")
     print(f"   • Серверов в черном списке: {len(bl_tags)}")
     print(f"   • Всего записей в файле подписки: {len(final_configs)}")
+    print("   • Результат сохранён в subscription.json и subscription.txt")
 
 
 if __name__ == '__main__':
