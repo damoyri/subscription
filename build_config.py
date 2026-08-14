@@ -54,12 +54,12 @@ EXTRA_URLS = [
     "https://github.com/AvenCores/goida-vpn-configs/raw/refs/heads/main/githubmirror/26.txt",
 ]
 
-TCP_TIMEOUT = 3.0
-SINGBOX_PORT_WAIT = 5.0          # сколько ждём открытия SOCKS-порта sing-box
-SINGBOX_CURL_TIMEOUT = 10.0
-MAX_FOR_SINGBOX = 500            # сколько лучших по TCP-пингу гоняем через sing-box
+TCP_TIMEOUT = 5.0
+SINGBOX_PORT_WAIT = 8.0          # сколько ждём открытия SOCKS-порта sing-box
+SINGBOX_CURL_TIMEOUT = 15.0
+MAX_FOR_SINGBOX = 150            # сколько лучших по TCP-пингу гоняем через sing-box
 MAX_SERVERS_PER_BALANCER = 100
-CONCURRENCY_LIMIT = min((os.cpu_count() or 4) * 4, 40)  # одновременных sing-box проверок
+CONCURRENCY_LIMIT = 8  # одновременных sing-box проверок
 BASE_TEST_PORT = 20000           # диапазон портов для тестовых SOCKS-инстансов
 VALID_FINGERPRINTS = {"chrome", "firefox", "edge", "safari", "ios", "android", "qq", "random"}
 EXCLUDE_PATTERN = re.compile(r"(Россия|anycast|Беларусь|🇷🇺|🇧🇾|Russia|Belarus)", re.IGNORECASE)
@@ -632,18 +632,35 @@ async def check_via_singbox(outbound: Dict[str, Any], test_port: int,
         return None
 
     outbound_copy = json.loads(json.dumps(outbound))
-    # КРИТИЧНОЕ ИСПРАВЛЕНИЕ: тег обязан быть непустой строкой, иначе routing
-    # получит null и sing-box не сможет промаршрутизировать трафик.
-    outbound_copy["tag"] = "proxy"
+    outbound_copy["tag"] = "proxy"   # обязательный тег
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = os.path.join(tmpdir, "config.json")
+        # Корректный формат для sing-box 1.11+
         config = {
-            "log": {"loglevel": "error"},
-            "inbounds": [{"type": "socks", "tag": "socks-in", "listen": "127.0.0.1", "port": test_port}],
-            "outbounds": [outbound_copy],
-            "route": {"rules": [{"outbound": "proxy", "network": "tcp"}]},
+            "log": {"level": "warn"},
+            "inbounds": [
+                {
+                    "type": "socks",
+                    "tag": "socks-in",
+                    "listen": "127.0.0.1",
+                    "listen_port": test_port,
+                    "sniff": True,
+                    "sniff_override_destination": False,
+                }
+            ],
+            "outbounds": [
+                outbound_copy,
+                {"type": "direct", "tag": "direct"}
+            ],
+            "route": {
+                "rules": [
+                    {"inbound": ["socks-in"], "outbound": "proxy"}
+                ],
+                "final": "proxy"
+            }
         }
+
         with open(config_path, "w") as f:
             json.dump(config, f)
 
@@ -651,24 +668,39 @@ async def check_via_singbox(outbound: Dict[str, Any], test_port: int,
         try:
             proc = await asyncio.create_subprocess_exec(
                 "sing-box", "run", "-c", config_path,
-                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
             )
 
             port_ready = await _wait_for_port("127.0.0.1", test_port, SINGBOX_PORT_WAIT)
             if not port_ready:
+                _, stderr = await proc.communicate()
+                if stderr:
+                    log_err(f"⚠️ sing-box не запустился на порту {test_port}: {stderr.decode(errors='ignore')[:300]}")
                 return None
 
+            # ================================================================
+            # ИСПРАВЛЕННЫЙ ВЫЗОВ curl – без --retry, с чёткими таймаутами
+            # ================================================================
             curl_proc = await asyncio.create_subprocess_exec(
                 "curl", "-s", "-o", "/dev/null", "-w", "%{time_total}",
-                "--socks5", f"127.0.0.1:{test_port}", "--max-time", str(int(timeout)),
-                "--retry", "1", "--retry-delay", "1", "--retry-connrefused",
+                "--socks5", f"127.0.0.1:{test_port}",
+                "--connect-timeout", "5",      # максимум 5 секунд на соединение
+                "--max-time", "10",            # общий лимит 10 секунд (не ждём дольше)
                 "http://www.gstatic.com/generate_204",
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
             try:
-                stdout, _ = await asyncio.wait_for(curl_proc.communicate(), timeout=timeout + 5)
+                # Даём curl чуть больше времени, чем его внутренний --max-time,
+                # чтобы не убивать процесс до его естественного завершения.
+                stdout, stderr = await asyncio.wait_for(
+                    curl_proc.communicate(),
+                    timeout=timeout + 2   # если timeout=15, то ждём 17 сек
+                )
             except asyncio.TimeoutError:
                 curl_proc.kill()
+                log_err(f"⚠️ curl таймаут (порт {test_port})")
                 return None
 
             if curl_proc.returncode == 0:
@@ -676,14 +708,19 @@ async def check_via_singbox(outbound: Dict[str, Any], test_port: int,
                     return float(stdout.decode().strip())
                 except ValueError:
                     return None
-            return None
-        except Exception:
+            else:
+                err_msg = stderr.decode(errors='ignore').strip()
+                if err_msg:
+                    log_err(f"⚠️ curl ошибка (порт {test_port}): {err_msg[:200]}")
+                return None
+        except Exception as e:
+            log_err(f"⚠️ Исключение в check_via_singbox: {mask_secret(str(e))}")
             return None
         finally:
             if proc is not None:
                 try:
                     proc.terminate()
-                    await asyncio.wait_for(proc.wait(), timeout=2)
+                    await asyncio.wait_for(proc.wait(), timeout=3)
                 except Exception:
                     try:
                         proc.kill()
