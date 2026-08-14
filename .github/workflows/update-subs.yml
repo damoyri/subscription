@@ -18,6 +18,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y curl jq
 
+      - name: Pull latest changes (avoid conflicts)
+        run: git pull --rebase origin main || echo "No upstream changes"
+
       - name: Run config builder
         run: python3 build_config.py
 
@@ -26,7 +29,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add subscription.json subscription.txt
-          git commit -m "Update subscription files" || echo "No changes"
+          git commit -m "Update subscription files" || echo "No changes to commit"
+          git pull --rebase origin main || echo "Rebase done"
           git push origin main
 
       - name: Push to Bitbucket (SSH)
