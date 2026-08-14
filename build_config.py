@@ -4,13 +4,15 @@ import re
 import subprocess
 import sys
 import urllib.parse
-import base64  # <-- добавили
 
 VALID_FINGERPRINTS = ['chrome', 'firefox', 'edge', 'safari', 'ios', 'android', 'qq', 'random']
-EXCLUDE_PATTERN = re.compile(r'(Россия|anycast|Беларусь|🇷🇺|🇧🇾|Russia|Belarus)', re.IGNORECASE)
+EXCLUDE_PATTERN = re.compile(r'(Р РѕСЃСЃРёСЏ|anycast|Р‘РµР»Р°СЂСѓСЃСЊ|рџ‡·рџ‡є|рџ‡§рџ‡ѕ|Russia|Belarus)', re.IGNORECASE)
 
 
 def fetch_url(url, timeout=15):
+    """
+    РЎРєР°С‡РёРІР°РЅРёРµ С‡РµСЂРµР· curl вЂ” СЃР°РјС‹Р№ РЅР°РґРµР¶РЅС‹Р№ СЃРїРѕСЃРѕР± РІ GitHub Actions.
+    """
     try:
         result = subprocess.run(
             ['curl', '-sL', '--max-time', str(timeout), url],
@@ -18,7 +20,7 @@ def fetch_url(url, timeout=15):
         )
         return result.stdout.strip()
     except Exception as e:
-        print(f"⚠️ Ошибка загрузки {url}: {e}", file=sys.stderr)
+        print(f"вљ пёЏ РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё {url} С‡РµСЂРµР· curl: {e}", file=sys.stderr)
         return None
 
 
@@ -98,25 +100,34 @@ def create_config_template(remarks_text):
 
 
 def parse_vless_url(raw_url):
+    """Р‘РµР·РѕРїР°СЃРЅС‹Р№ РїР°СЂСЃРёРЅРі VLESS URL."""
     remarks = ''
     url_str = raw_url.strip()
+
     if '#' in url_str:
         url_str, remarks = url_str.split('#', 1)
         remarks = urllib.parse.unquote(remarks.strip())
+
     if not url_str.startswith('vless://'):
         return None, remarks
+
     try:
         parsed = urllib.parse.urlparse(url_str)
         user_id = parsed.username
         address = parsed.hostname
         port = parsed.port or 443
+
         if not user_id or not address:
             return None, remarks
+
         query_params = urllib.parse.parse_qs(parsed.query)
         params = {k: v[0] for k, v in query_params.items() if v}
+
         fp_raw = params.get('fp') or params.get('fingerprint', 'chrome')
         fingerprint = clean_fingerprint(fp_raw)
+
         is_reality = ('pbk' in params) or ('publicKey' in params) or (params.get('security') == 'reality')
+
         outbound = {
             "tag": None,
             "protocol": "vless",
@@ -138,6 +149,7 @@ def parse_vless_url(raw_url):
                 "tcpSettings": {"header": {"type": "none"}}
             }
         }
+
         if is_reality:
             outbound["streamSettings"]["realitySettings"] = {
                 "allowInsecure": False,
@@ -153,107 +165,72 @@ def parse_vless_url(raw_url):
                 "serverName": params.get('sni', address),
                 "fingerprint": fingerprint
             }
+
         return outbound, remarks
+
     except Exception:
         return None, remarks
 
 
 def get_vless_links(urls_list):
+    """Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅР°СЏ С„СѓРЅРєС†РёСЏ РґР»СЏ РјР°СЃСЃРѕРІРѕРіРѕ СЃРєР°С‡РёРІР°РЅРёСЏ VLESS СЃСЃС‹Р»РѕРє РёР· СЃРїРёСЃРєР° URL"""
     all_links = []
     for url in urls_list:
-        print(f"📥 Скачиваем список: {url}")
+        print(f"рџ“Ґ РЎРєР°С‡РёРІР°РµРј СЃРїРёСЃРѕРє: {url}")
         content = fetch_url(url)
         if content:
             for line in content.splitlines():
                 line = line.strip()
                 if line.startswith('vless://'):
                     all_links.append(line)
+    
+    # Р’РѕР·РІСЂР°С‰Р°РµРј РѕС‡РёС‰РµРЅРЅС‹Р№ СЃРїРёСЃРѕРє Р±РµР· РґСѓР±Р»РёРєР°С‚РѕРІ
     return list(dict.fromkeys(all_links))
 
 
 def main():
-    # ===== ПЛАТНАЯ ПОДПИСКА =====
-    print("📥 Загрузка платной подписки...")
+    print("рџ“Ґ Р—Р°РіСЂСѓР·РєР° РїР»Р°С‚РЅРѕР№ РїРѕРґРїРёСЃРєРё...")
     paid_sub_url = 'https://vlv.one/h7n0gvdjvv'
     paid_sub_raw = fetch_url(paid_sub_url)
     existing_configs = []
 
     if paid_sub_raw:
-        # 1) Пробуем как JSON
         try:
             parsed_json = json.loads(paid_sub_raw)
             if isinstance(parsed_json, list):
                 existing_configs = parsed_json
-                print(f"✅ Загружено {len(existing_configs)} платных конфигов (JSON)")
-            else:
-                print("⚠️ Ответ JSON, но не массив – пробуем как base64")
-                # если вдруг пришёл JSON-объект, а не массив – тоже пробуем base64
-                # (но это маловероятно)
         except json.JSONDecodeError:
-            # 2) Не JSON – пробуем как base64
-            print("⚠️ Ответ не JSON, пытаемся декодировать base64")
-            decoded_text = None
-            # Проверяем, похоже на base64
-            if re.fullmatch(r'^[A-Za-z0-9+/=]+$', paid_sub_raw.strip()):
-                try:
-                    decoded_bytes = base64.b64decode(paid_sub_raw)
-                    decoded_text = decoded_bytes.decode('utf-8', errors='ignore')
-                    print("🔓 Успешно декодировано из base64")
-                except Exception as e:
-                    print(f"⚠️ Ошибка декодирования base64: {e}")
-            else:
-                # возможно, это просто текст с vless-ссылками
-                decoded_text = paid_sub_raw
+            print("вљ пёЏ РћС€РёР±РєР° РїР°СЂСЃРёРЅРіР° JSON РїР»Р°С‚РЅРѕР№ РїРѕРґРїРёСЃРєРё", file=sys.stderr)
 
-            if decoded_text:
-                # Ищем VLESS-ссылки в декодированном тексте
-                paid_links = []
-                for line in decoded_text.splitlines():
-                    line = line.strip()
-                    if line.startswith('vless://'):
-                        paid_links.append(line)
-                if paid_links:
-                    print(f"🔗 Найдено {len(paid_links)} VLESS-ссылок в платной подписке")
-                    # Для каждой ссылки создаём отдельный конфиг
-                    for idx, link in enumerate(paid_links, start=1):
-                        ob, rem = parse_vless_url(link)
-                        if ob is not None:
-                            # Формируем remarks
-                            if rem:
-                                remark_text = f"Paid #{idx} - {rem}"
-                            else:
-                                remark_text = f"Paid #{idx}"
-                            # Создаём шаблон конфига
-                            config = create_config_template(remark_text)
-                            # Назначаем тег для outbound
-                            tag = f"paid-{idx}"
-                            ob['tag'] = tag
-                            direct_block = [
-                                {"protocol": "freedom", "settings": {"domainStrategy": "UseIP"}, "tag": "direct"},
-                                {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"}
-                            ]
-                            config['outbounds'] = [ob] + direct_block
-                            config['routing']['balancers'][0]['selector'] = [tag]
-                            config['burstObservatory']['subjectSelector'] = [tag]
-                            existing_configs.append(config)
-                            print(f"   ✅ Создан конфиг для сервера #{idx}: {rem or 'без названия'}")
-                    print(f"✅ Всего создано платных конфигов: {len(existing_configs)}")
-                else:
-                    print("⚠️ В ответе не найдено VLESS-ссылок")
-            else:
-                print("⚠️ Не удалось декодировать ответ")
-    else:
-        print("⚠️ Не удалось загрузить платную подписку")
+    # Р—РђР©РРўРђ: Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ СЃС‚Р°СЂС‹С… РєРѕРЅС„РёРіРѕРІ
+    if not existing_configs:
+        print("вљ пёЏ РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РїР»Р°С‚РЅСѓСЋ РїРѕРґРїРёСЃРєСѓ РїРѕ СЃРµС‚Рё. РџСЂРѕР±СѓРµРј РІРѕСЃСЃС‚Р°РЅРѕРІРёС‚СЊ РёР· РїСЂРѕС€Р»С‹С… РґР°РЅРЅС‹С…...")
+        try:
+            with open('subscription.json', 'r', encoding='utf-8') as f:
+                old_file_data = json.load(f)
+                if isinstance(old_file_data, list):
+                    # РСЃРєР»СЋС‡Р°РµРј РІСЃРµ СЂР°РЅРµРµ СЃРіРµРЅРµСЂРёСЂРѕРІР°РЅРЅС‹Рµ Р±Р°Р»Р°РЅСЃРёСЂРѕРІС‰РёРєРё (РїРѕ СЌРјРѕРґР·Рё Рё СЃС‚Р°СЂРѕРјСѓ РЅР°Р·РІР°РЅРёСЋ)
+                    exclude_prefixes = ('рџЏіпёЏlist', 'рџЏґlist')
+                    existing_configs = [
+                        c for c in old_file_data 
+                        if isinstance(c, dict) and not c.get('remarks', '').startswith(exclude_prefixes)
+                    ]
+                    print(f"рџ”„ Р—Р°РіСЂСѓР¶РµРЅРѕ {len(existing_configs)} РїР»Р°С‚РЅС‹С… РєРѕРЅС„РёРіРѕРІ РёР· СЃРѕС…СЂР°РЅРµРЅРЅРѕРіРѕ subscription.json")
+        except Exception as e:
+            print(f"вљ пёЏ РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ РїСЂРѕС€Р»С‹Р№ subscription.json: {e}")
 
-    print(f"Итого платных конфигов: {len(existing_configs)}\n")
+    print(f"РС‚РѕРіРѕ РїР»Р°С‚РЅС‹С… РєРѕРЅС„РёРіРѕРІ: {len(existing_configs)}\n")
 
-    # ===== БЕЛЫЙ СПИСОК =====
+    # ==========================
+    # РћР‘Р РђР‘РћРўРљРђ Р‘Р•Р›Р«РҐ РЎРџРРЎРљРћР’
+    # ==========================
     white_urls = [
         "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt",
         "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt"
     ]
+    
     white_links = get_vless_links(white_urls)
-    print(f"Найдено {len(white_links)} уникальных ссылок (Белые списки)")
+    print(f"РќР°Р№РґРµРЅРѕ {len(white_links)} СѓРЅРёРєР°Р»СЊРЅС‹С… СЃСЃС‹Р»РѕРє (Р‘РµР»С‹Рµ СЃРїРёСЃРєРё)")
 
     white_parsed = []
     for link in white_links:
@@ -268,21 +245,26 @@ def main():
 
     for idx, (ob, rem) in enumerate(white_parsed, start=1):
         tag = f"proxy-wl-{idx}"
+        
         ob_copy = json.loads(json.dumps(ob))
         ob_copy['tag'] = tag
         wl_outbounds_all.append(ob_copy)
         wl_tags_all.append(tag)
+
         if not is_russia_or_belarus(rem):
             wl_outbounds_noru.append(ob_copy)
             wl_tags_noru.append(tag)
 
-    # ===== ЧЁРНЫЙ СПИСОК =====
+    # ==========================
+    # РћР‘Р РђР‘РћРўРљРђ Р§Р•Р РќРћР“Рћ РЎРџРРЎРљРђ
+    # ==========================
     print("\n")
     black_urls = [
         "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/BLACK_VLESS_RUS_mobile.txt"
     ]
+    
     black_links = get_vless_links(black_urls)
-    print(f"Найдено {len(black_links)} уникальных ссылок (Черные списки)")
+    print(f"РќР°Р№РґРµРЅРѕ {len(black_links)} СѓРЅРёРєР°Р»СЊРЅС‹С… СЃСЃС‹Р»РѕРє (Р§РµСЂРЅС‹Рµ СЃРїРёСЃРєРё)")
 
     black_parsed = []
     for link in black_links:
@@ -292,30 +274,38 @@ def main():
 
     bl_outbounds = []
     bl_tags = []
+
     for idx, (ob, rem) in enumerate(black_parsed, start=1):
         tag = f"proxy-bl-{idx}"
+        
         ob_copy = json.loads(json.dumps(ob))
         ob_copy['tag'] = tag
         bl_outbounds.append(ob_copy)
         bl_tags.append(tag)
 
-    # ===== СБОРКА =====
+    # ==========================
+    # РЎР‘РћР РљРђ РРўРћР“РћР’Р«РҐ РљРћРќР¤РР“РћР’
+    # ==========================
     direct_block = [
         {"protocol": "freedom", "settings": {"domainStrategy": "UseIP"}, "tag": "direct"},
         {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"}
     ]
 
-    config_wl_all = create_config_template("🏳️list [LTE]")
+    # 1. Р‘РµР»С‹Р№ СЃРїРёСЃРѕРє (Р’СЃРµ)
+    config_wl_all = create_config_template("рџЏіпёЏlist [LTE]")
     config_wl_all['outbounds'] = wl_outbounds_all + direct_block
     config_wl_all['routing']['balancers'][0]['selector'] = wl_tags_all
     config_wl_all['burstObservatory']['subjectSelector'] = wl_tags_all
 
-    config_wl_noru = create_config_template("🏳️list [LTE] NoRU/BY")
+    # 2. Р‘РµР»С‹Р№ СЃРїРёСЃРѕРє (Р‘РµР· RU/BY)
+    config_wl_noru = create_config_template("рџЏіпёЏlist [LTE] NoRU/BY")
     config_wl_noru['outbounds'] = wl_outbounds_noru + direct_block
     config_wl_noru['routing']['balancers'][0]['selector'] = wl_tags_noru
     config_wl_noru['burstObservatory']['subjectSelector'] = wl_tags_noru
 
-    config_bl = create_config_template("🏴list [wifi]")
+    # 3. Р§РµСЂРЅС‹Р№ СЃРїРёСЃРѕРє
+    config_bl = create_config_template("рџЏґlist [wifi]")
+    # РџСЂРѕРІРµСЂРєР° РЅР° СЃР»СѓС‡Р°Р№, РµСЃР»Рё С‡РµСЂРЅС‹Р№ СЃРїРёСЃРѕРє РїСѓСЃС‚
     if bl_outbounds:
         config_bl['outbounds'] = bl_outbounds + direct_block
         config_bl['routing']['balancers'][0]['selector'] = bl_tags
@@ -323,20 +313,23 @@ def main():
     else:
         config_bl['outbounds'] = direct_block
 
-    # Финальный список: три балансировщика + все платные конфиги (каждый отдельно)
+    # РћР±СЉРµРґРёРЅСЏРµРј РІСЃРµ СЃРіРµРЅРµСЂРёСЂРѕРІР°РЅРЅС‹Рµ Р±Р°Р»Р°РЅСЃРёСЂРѕРІС‰РёРєРё Рё РїР»Р°С‚РЅС‹Рµ РєРѕРЅС„РёРіРё
     final_configs = [config_wl_all, config_wl_noru, config_bl] + existing_configs
 
+    # РЎРѕС…СЂР°РЅРµРЅРёРµ РІ subscription.json
     with open('subscription.json', 'w', encoding='utf-8') as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
+
+    # Р”РћР‘РђР’Р›Р•РќРћ: РЎРѕС…СЂР°РЅРµРЅРёРµ РІ subscription.txt (С‚Р°РєРѕР№ Р¶Рµ JSON, РЅРѕ РІ С‚РµРєСЃС‚РѕРІРѕРј С„Р°Р№Р»Рµ)
     with open('subscription.txt', 'w', encoding='utf-8') as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
 
-    print("\n✅ Успешно обновлено!")
-    print(f"   • Серверов в белом списке (Все): {len(wl_tags_all)}")
-    print(f"   • Серверов в белом списке (NoRU/BY): {len(wl_tags_noru)}")
-    print(f"   • Серверов в черном списке: {len(bl_tags)}")
-    print(f"   • Платных конфигов: {len(existing_configs)}")
-    print(f"   • Всего записей: {len(final_configs)}")
+    print("\nвњ… РЈСЃРїРµС€РЅРѕ РѕР±РЅРѕРІР»РµРЅРѕ!")
+    print(f"   вЂў РЎРµСЂРІРµСЂРѕРІ РІ Р±РµР»РѕРј СЃРїРёСЃРєРµ (Р’СЃРµ): {len(wl_tags_all)}")
+    print(f"   вЂў РЎРµСЂРІРµСЂРѕРІ РІ Р±РµР»РѕРј СЃРїРёСЃРєРµ (NoRU/BY): {len(wl_tags_noru)}")
+    print(f"   вЂў РЎРµСЂРІРµСЂРѕРІ РІ С‡РµСЂРЅРѕРј СЃРїРёСЃРєРµ: {len(bl_tags)}")
+    print(f"   вЂў Р’СЃРµРіРѕ Р·Р°РїРёСЃРµР№ РІ С„Р°Р№Р»Рµ РїРѕРґРїРёСЃРєРё: {len(final_configs)}")
+    print("   вЂў Р РµР·СѓР»СЊС‚Р°С‚ СЃРѕС…СЂР°РЅС‘РЅ РІ subscription.json Рё subscription.txt")
 
 
 if __name__ == '__main__':
