@@ -2,6 +2,7 @@ name: Mirror to Bitbucket
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 jobs:
   mirror:
     runs-on: ubuntu-latest
