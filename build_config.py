@@ -636,17 +636,16 @@ async def check_via_singbox(outbound: Dict[str, Any], test_port: int,
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = os.path.join(tmpdir, "config.json")
-        # ✅ ПРАВИЛЬНЫЙ ФОРМАТ ДЛЯ SING-BOX 1.13+
+        # Совместимо с sing-box 1.13+
         config = {
             "log": {"level": "warn"},
             "inbounds": [
                 {
-                    "type": "socks",           # было "protocol"
+                    "type": "socks",
                     "tag": "socks-in",
                     "listen": "127.0.0.1",
-                    "listen_port": test_port,  # было "port"
+                    "listen_port": test_port,
                     "sniff": True,
-                    "sniff_override_destination": False,
                 }
             ],
             "outbounds": [
@@ -655,7 +654,7 @@ async def check_via_singbox(outbound: Dict[str, Any], test_port: int,
             ],
             "route": {
                 "rules": [
-                    {"inbound": ["socks-in"], "outbound": "proxy"}
+                    {"inbound": ["socks-in"], "action": "route", "outbound": "proxy"}
                 ],
                 "final": "proxy"
             }
@@ -663,66 +662,6 @@ async def check_via_singbox(outbound: Dict[str, Any], test_port: int,
 
         with open(config_path, "w") as f:
             json.dump(config, f)
-
-        proc = None
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "sing-box", "run", "-c", config_path,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            port_ready = await _wait_for_port("127.0.0.1", test_port, SINGBOX_PORT_WAIT)
-            if not port_ready:
-                _, stderr = await proc.communicate()
-                if stderr:
-                    log_err(f"⚠️ sing-box не запустился на порту {test_port}: {stderr.decode(errors='ignore')[:300]}")
-                return None
-
-            # ✅ curl без --retry, с чёткими таймаутами
-            curl_proc = await asyncio.create_subprocess_exec(
-                "curl", "-s", "-o", "/dev/null", "-w", "%{time_total}",
-                "--socks5", f"127.0.0.1:{test_port}",
-                "--connect-timeout", "5",
-                "--max-time", "10",
-                "http://www.gstatic.com/generate_204",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            try:
-                stdout, stderr = await asyncio.wait_for(
-                    curl_proc.communicate(),
-                    timeout=timeout + 2
-                )
-            except asyncio.TimeoutError:
-                curl_proc.kill()
-                log_err(f"⚠️ curl таймаут (порт {test_port})")
-                return None
-
-            if curl_proc.returncode == 0:
-                try:
-                    return float(stdout.decode().strip())
-                except ValueError:
-                    return None
-            else:
-                err_msg = stderr.decode(errors='ignore').strip()
-                if err_msg:
-                    log_err(f"⚠️ curl ошибка (порт {test_port}): {err_msg[:200]}")
-                return None
-        except Exception as e:
-            log_err(f"⚠️ Исключение в check_via_singbox: {mask_secret(str(e))}")
-            return None
-        finally:
-            if proc is not None:
-                try:
-                    proc.terminate()
-                    await asyncio.wait_for(proc.wait(), timeout=3)
-                except Exception:
-                    try:
-                        proc.kill()
-                        await proc.wait()
-                    except Exception:
-                        pass
 
 
 @dataclass
