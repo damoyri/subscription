@@ -4,6 +4,7 @@ import re
 import subprocess
 import sys
 import urllib.parse
+import base64  # <-- добавили
 
 VALID_FINGERPRINTS = ['chrome', 'firefox', 'edge', 'safari', 'ios', 'android', 'qq', 'random']
 EXCLUDE_PATTERN = re.compile(r'(Россия|anycast|Беларусь|🇷🇺|🇧🇾|Russia|Belarus)', re.IGNORECASE)
@@ -171,22 +172,76 @@ def get_vless_links(urls_list):
 
 
 def main():
-    # ===== ПЛАТНАЯ ПОДПИСКА – только JSON, без восстановления =====
+    # ===== ПЛАТНАЯ ПОДПИСКА =====
     print("📥 Загрузка платной подписки...")
     paid_sub_url = 'https://vlv.one/h7n0gvdjvv'
     paid_sub_raw = fetch_url(paid_sub_url)
     existing_configs = []
 
     if paid_sub_raw:
+        # 1) Пробуем как JSON
         try:
             parsed_json = json.loads(paid_sub_raw)
             if isinstance(parsed_json, list):
                 existing_configs = parsed_json
                 print(f"✅ Загружено {len(existing_configs)} платных конфигов (JSON)")
             else:
-                print("⚠️ Ответ JSON, но не массив – игнорируем")
+                print("⚠️ Ответ JSON, но не массив – пробуем как base64")
+                # если вдруг пришёл JSON-объект, а не массив – тоже пробуем base64
+                # (но это маловероятно)
         except json.JSONDecodeError:
-            print("⚠️ Ответ не JSON – платная подписка не загружена")
+            # 2) Не JSON – пробуем как base64
+            print("⚠️ Ответ не JSON, пытаемся декодировать base64")
+            decoded_text = None
+            # Проверяем, похоже на base64
+            if re.fullmatch(r'^[A-Za-z0-9+/=]+$', paid_sub_raw.strip()):
+                try:
+                    decoded_bytes = base64.b64decode(paid_sub_raw)
+                    decoded_text = decoded_bytes.decode('utf-8', errors='ignore')
+                    print("🔓 Успешно декодировано из base64")
+                except Exception as e:
+                    print(f"⚠️ Ошибка декодирования base64: {e}")
+            else:
+                # возможно, это просто текст с vless-ссылками
+                decoded_text = paid_sub_raw
+
+            if decoded_text:
+                # Ищем VLESS-ссылки в декодированном тексте
+                paid_links = []
+                for line in decoded_text.splitlines():
+                    line = line.strip()
+                    if line.startswith('vless://'):
+                        paid_links.append(line)
+                if paid_links:
+                    print(f"🔗 Найдено {len(paid_links)} VLESS-ссылок в платной подписке")
+                    # Для каждой ссылки создаём отдельный конфиг
+                    for idx, link in enumerate(paid_links, start=1):
+                        ob, rem = parse_vless_url(link)
+                        if ob is not None:
+                            # Формируем remarks
+                            if rem:
+                                remark_text = f"Paid #{idx} - {rem}"
+                            else:
+                                remark_text = f"Paid #{idx}"
+                            # Создаём шаблон конфига
+                            config = create_config_template(remark_text)
+                            # Назначаем тег для outbound
+                            tag = f"paid-{idx}"
+                            ob['tag'] = tag
+                            direct_block = [
+                                {"protocol": "freedom", "settings": {"domainStrategy": "UseIP"}, "tag": "direct"},
+                                {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"}
+                            ]
+                            config['outbounds'] = [ob] + direct_block
+                            config['routing']['balancers'][0]['selector'] = [tag]
+                            config['burstObservatory']['subjectSelector'] = [tag]
+                            existing_configs.append(config)
+                            print(f"   ✅ Создан конфиг для сервера #{idx}: {rem or 'без названия'}")
+                    print(f"✅ Всего создано платных конфигов: {len(existing_configs)}")
+                else:
+                    print("⚠️ В ответе не найдено VLESS-ссылок")
+            else:
+                print("⚠️ Не удалось декодировать ответ")
     else:
         print("⚠️ Не удалось загрузить платную подписку")
 
@@ -268,7 +323,7 @@ def main():
     else:
         config_bl['outbounds'] = direct_block
 
-    # Финальный список: три балансировщика + платные конфиги (если есть)
+    # Финальный список: три балансировщика + все платные конфиги (каждый отдельно)
     final_configs = [config_wl_all, config_wl_noru, config_bl] + existing_configs
 
     with open('subscription.json', 'w', encoding='utf-8') as f:
