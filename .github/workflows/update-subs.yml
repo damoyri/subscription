@@ -20,12 +20,15 @@ jobs:
 
       - name: Install sing-box
         run: |
-          LATEST_URL=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | jq -r '.assets[] | select(.name | contains("linux-amd64")) | .browser_download_url')
-          if [ -z "$LATEST_URL" ]; then
-            echo "Failed to get latest sing-box download URL"
+          # Скачиваем с правильным заголовком Accept
+          curl -L -H "Accept: application/octet-stream" -o sing-box.tar.gz \
+            https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-linux-amd64.tar.gz
+          # Проверяем, что файл не пустой
+          if [ ! -s sing-box.tar.gz ]; then
+            echo "Download failed or empty file"
             exit 1
           fi
-          curl -sL -o sing-box.tar.gz "$LATEST_URL"
+          # Распаковываем и перемещаем бинарник
           tar -xzf sing-box.tar.gz --strip-components=1 -C /tmp $(tar -tzf sing-box.tar.gz | grep '/sing-box$')
           sudo mv /tmp/sing-box /usr/local/bin/sing-box
           sudo chmod +x /usr/local/bin/sing-box
