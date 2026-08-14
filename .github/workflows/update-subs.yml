@@ -28,7 +28,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add subscription.json subscription.txt
+          git add subscription.json subscription.txt sub2.txt sub2.json
           git commit -m "Update subscription files" || echo "No changes to commit"
           git pull --rebase origin main || echo "Rebase done"
           git push origin main
