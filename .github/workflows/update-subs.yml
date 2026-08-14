@@ -21,10 +21,20 @@ jobs:
       - name: Run config builder
         run: python3 build_config.py
 
-      - name: Commit and push
+      - name: Commit and push to GitHub
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add subscription.json
           git commit -m "Update subscription.json" || echo "No changes"
           git push origin main
+
+      - name: Push to Bitbucket (SSH)
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BITBUCKET_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
+          git remote add bitbucket git@bitbucket.org:damoyri/subscription.git
+          git push --force --all bitbucket
+          git push --force --tags bitbucket
