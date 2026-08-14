@@ -770,7 +770,7 @@ async def main_async() -> None:
         out = []
         for link in links:
             p = parse_proxy_url(link)
-            if p is not None:
+            if p is not None and p.outbound.get("protocol") != "hysteria2":
                 out.append(p)
         return out
 
