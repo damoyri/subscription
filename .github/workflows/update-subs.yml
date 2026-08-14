@@ -20,29 +20,18 @@ jobs:
 
       - name: Install sing-box
         run: |
-          # Получаем информацию о последнем релизе через API
-          RELEASE_JSON=$(curl -s -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/SagerNet/sing-box/releases/latest)
+          # Скачиваем напрямую с официального URL, добавляя правильные заголовки
+          curl -L -H "Accept: application/octet-stream" -H "User-Agent: Mozilla/5.0" -o sing-box.tar.gz \
+            https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-linux-amd64.tar.gz
           
-          # Извлекаем ТОЛЬКО URL для обычного linux-amd64 (без glibc/musl)
-          DOWNLOAD_URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name == "sing-box-linux-amd64.tar.gz") | .browser_download_url')
-          
-          # Если не найден, пробуем скачать через latest/download с правильными заголовками
-          if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ]; then
-            echo "Asset not found, trying fallback..."
-            DOWNLOAD_URL="https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-linux-amd64.tar.gz"
-          fi
-          
-          echo "Downloading from: $DOWNLOAD_URL"
-          curl -L -H "Accept: application/octet-stream" -H "User-Agent: curl" -o sing-box.tar.gz "$DOWNLOAD_URL"
-          
-          # Проверяем, что скачался настоящий архив (размер > 1 МБ)
-          if [ $(stat -c%s "sing-box.tar.gz") -lt 1000000 ]; then
-            echo "Downloaded file too small, likely an error page"
-            cat sing-box.tar.gz
+          # Проверяем, что файл действительно архив (размер > 1 МБ)
+          if [ ! -s sing-box.tar.gz ] || [ $(stat -c%s "sing-box.tar.gz") -lt 1000000 ]; then
+            echo "Download failed or file too small"
+            cat sing-box.tar.gz  # выводим для диагностики
             exit 1
           fi
           
+          # Распаковываем и устанавливаем бинарник
           tar -xzf sing-box.tar.gz --strip-components=1 -C /tmp $(tar -tzf sing-box.tar.gz | grep '/sing-box$')
           sudo mv /tmp/sing-box /usr/local/bin/sing-box
           sudo chmod +x /usr/local/bin/sing-box
