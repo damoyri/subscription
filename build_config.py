@@ -190,7 +190,7 @@ def get_vless_links(urls_list):
 
 def main():
     print("📥 Загрузка платной подписки...")
-    paid_sub_url = 'https://vlv.one/h7n0gvdjvv'
+    paid_sub_url = 'https://connliberty.com/connection/subs/22a12228-aa7d-4f34-a7cd-b617a8f61c20'
     paid_sub_raw = fetch_url(paid_sub_url)
     existing_configs = []
 
