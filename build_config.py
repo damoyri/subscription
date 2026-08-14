@@ -1,25 +1,27 @@
 #!/usr/bin/env python3
 import json
 import re
+import subprocess
 import sys
 import urllib.parse
-import urllib.request
 
 VALID_FINGERPRINTS = ['chrome', 'firefox', 'edge', 'safari', 'ios', 'android', 'qq', 'random']
 EXCLUDE_PATTERN = re.compile(r'(Россия|anycast|Беларусь|🇷🇺|🇧🇾|Russia|Belarus)', re.IGNORECASE)
 
 
-def fetch_url(url, timeout=12):
-    """Безопасно скачивает содержимое по URL с помощью urllib."""
-    req = urllib.request.Request(
-        url,
-        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-    )
+def fetch_url(url, timeout=15):
+    """
+    Скачивание через curl — самый надежный способ в GitHub Actions,
+    так как он обходит стандартные блокировки Python urllib со стороны Cloudflare/SSL.
+    """
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            return response.read().decode('utf-8', errors='ignore')
+        result = subprocess.run(
+            ['curl', '-sL', '--max-time', str(timeout), url],
+            capture_output=True, text=True, check=True
+        )
+        return result.stdout.strip()
     except Exception as e:
-        print(f"⚠️ Ошибка загрузки {url}: {e}", file=sys.stderr)
+        print(f"⚠️ Ошибка загрузки {url} через curl: {e}", file=sys.stderr)
         return None
 
 
@@ -77,7 +79,7 @@ def create_config_template(remarks_text):
                             "maxRTT": "7s",                         # Увеличено под высокий пинг
                             "expected": 1,
                             "baselines": ["500ms", "1500ms", "3000ms"], # Расширен диапазон задержек
-                            "tolerance": 0.1                       # Допуск 10% для защиты от флиппинга
+                            "tolerance": 0.1                       # Допуск 10% против флиппинга
                         }
                     },
                     "fallbackTag": "direct"
@@ -88,7 +90,7 @@ def create_config_template(remarks_text):
             "pingConfig": {
                 "timeout": "7s",                                    # Даем 7 сек на ответ
                 "interval": "1m",                                   # Проверка каждую 1 минуту
-                "sampling": 2,                                      # 2 запроса для исключения случайных потерь
+                "sampling": 2,                                      # 2 запроса для проверки
                 "destination": "http://www.gstatic.com/generate_204"
             },
             "subjectSelector": []
@@ -99,7 +101,7 @@ def create_config_template(remarks_text):
 
 
 def parse_vless_url(raw_url):
-    """Надежный парсинг VLESS URL с помощью urllib.parse."""
+    """Безопасный парсинг VLESS URL."""
     remarks = ''
     url_str = raw_url.strip()
 
@@ -119,7 +121,6 @@ def parse_vless_url(raw_url):
         if not user_id or not address:
             return None, remarks
 
-        # Разбор Query-параметров
         query_params = urllib.parse.parse_qs(parsed.query)
         params = {k: v[0] for k, v in query_params.items() if v}
 
@@ -168,15 +169,16 @@ def parse_vless_url(raw_url):
 
         return outbound, remarks
 
-    except Exception as e:
+    except Exception:
         return None, remarks
 
 
 def main():
     print("📥 Скачиваем платную подписку...")
-    paid_sub_raw = fetch_url('https://connliberty.com/connection/subs/22a12228-aa7d-4f34-a7cd-b617a8f61c20')
+    paid_sub_url = 'https://connliberty.com/connection/subs/22a12228-aa7d-4f34-a7cd-b617a8f61c20'
+    paid_sub_raw = fetch_url(paid_sub_url)
     existing_configs = []
-    
+
     if paid_sub_raw:
         try:
             parsed_json = json.loads(paid_sub_raw)
@@ -185,7 +187,23 @@ def main():
         except json.JSONDecodeError:
             print("⚠️ Ошибка парсинга JSON платной подписки", file=sys.stderr)
 
-    print(f"Загружено {len(existing_configs)} конфигов из платной подписки")
+    # ЗАЩИТА: Если подписка не скачалась, пытаемся восстановить прошлые платные конфиги из локального subscription.json
+    if not existing_configs:
+        print("⚠️ Не удалось загрузить платную подписку по сети. Пробуем восстановить из прошлых данных...")
+        try:
+            with open('subscription.json', 'r', encoding='utf-8') as f:
+                old_file_data = json.load(f)
+                if isinstance(old_file_data, list):
+                    # Отфильтровываем сгенерированные ранее конфиги Игарька
+                    existing_configs = [
+                        c for c in old_file_data 
+                        if isinstance(c, dict) and not c.get('remarks', '').startswith('🇫🇲 АБС Igareck')
+                    ]
+                    print(f"🔄 Загружено {len(existing_configs)} платных конфигов из сохраненного subscription.json")
+        except Exception as e:
+            print(f"⚠️ Не удалось прочитать прошлый subscription.json: {e}")
+
+    print(f"Итого платных конфигов для включения в сборку: {len(existing_configs)}")
 
     icareck_urls = [
         "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt",
@@ -202,14 +220,14 @@ def main():
                 if line.startswith('vless://'):
                     all_links.append(line)
 
-    # Удаляем дубликаты ссылок с сохранением порядка
+    # Удаляем дубликаты ссылок
     all_links = list(dict.fromkeys(all_links))
 
     if not all_links:
-        print("❌ Не найдено ни одной VLESS ссылки", file=sys.stderr)
+        print("❌ Не найдено ни одной VLESS ссылки Игарька", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Найдено {len(all_links)} уникальных ссылок")
+    print(f"Найдено {len(all_links)} уникальных ссылок Игарька")
 
     parsed = []
     for link in all_links:
@@ -239,27 +257,28 @@ def main():
         {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"}
     ]
 
-    # Сборка общего конфига
+    # Сборка общего конфига Игарька
     config_all = create_config_template("🇫🇲 АБС Igareck [LTE]")
     config_all['outbounds'] = all_outbounds + direct_block
     config_all['routing']['balancers'][0]['selector'] = all_tags
     config_all['burstObservatory']['subjectSelector'] = all_tags
 
-    # Сборка фильтрованного конфига (без RU/BY)
+    # Сборка фильтрованного конфига Игарька (без RU/BY)
     config_filtered = create_config_template("🇫🇲 АБС Igareck [LTE] NoRU/BY")
     config_filtered['outbounds'] = filtered_outbounds + direct_block
     config_filtered['routing']['balancers'][0]['selector'] = filtered_tags
     config_filtered['burstObservatory']['subjectSelector'] = filtered_tags
 
+    # Объединяем 2 новых балансировщика + платные конфиги
     final_configs = [config_all, config_filtered] + existing_configs
 
     with open('subscription.json', 'w', encoding='utf-8') as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Успешно сгенерировано!")
-    print(f"   • Все серверы: {len(all_tags)}")
-    print(f"   • NoRU/BY серверы: {len(filtered_tags)}")
-    print(f"   • Итоговый размер файла: {len(final_configs)} конфигов")
+    print(f"✅ Успешно обновлено!")
+    print(f"   • Серверов в балансировщике (Все): {len(all_tags)}")
+    print(f"   • Серверов в балансировщике (NoRU/BY): {len(filtered_tags)}")
+    print(f"   • Всего записей в файле подписки: {len(final_configs)}")
 
 
 if __name__ == '__main__':
