@@ -1,515 +1,915 @@
 #!/usr/bin/env python3
+"""
+build_config.py — сборщик и проверщик VPN-конфигураций для sing-box.
+
+Объединяет лучшие решения из двух независимых код-ревью:
+  • модульный парсинг/генерация нескольких протоколов (vless, hysteria2, trojan,
+    shadowsocks, vmess) через реестр обработчиков (легко добавить новый протокол);
+  • исправление критического бага маршрутизации sing-box
+    (outbound.get("tag", "proxy") не срабатывал, т.к. ключ "tag" существовал со
+    значением None — тег теперь всегда принудительно проставляется в "proxy");
+  • секрет платной подписки только из переменной окружения, никогда в коде;
+  • устранение race condition при старте sing-box (активный poll порта вместо
+    фиксированного sleep);
+  • защита от падения sing-box на пустом balancer.selector (если рабочих
+    конфигов нет — балансировщик убирается, трафик идёт в direct);
+  • валидация обязательных полей Reality (pbk/publicKey);
+  • нормализация IPv6-адресов (квадратные скобки);
+  • безопасное логирование — секреты (UUID/пароли/ключи) маскируются перед
+    выводом в stderr/stdout, полный traceback никогда не печатается;
+  • асинхронная проверка через asyncio (TCP-пинг + запуск sing-box + curl),
+    что быстрее и стабильнее, чем process-pool с sleep().
+"""
+
+from __future__ import annotations
+
+import asyncio
+import base64
 import json
+import os
 import re
-import subprocess
+import shutil
 import sys
+import tempfile
+import time
 import urllib.parse
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
 
-VALID_FINGERPRINTS = ['chrome', 'firefox', 'edge', 'safari', 'ios', 'android', 'qq', 'random']
-EXCLUDE_PATTERN = re.compile(r'(Россия|anycast|Беларусь|🇷🇺|🇧🇾|Russia|Belarus)', re.IGNORECASE)
+# ============================================================================
+# Конфигурация (никаких секретов в коде!)
+# ============================================================================
+
+PAID_SUB_URL = os.environ.get("PAID_SUB_URL", "")  # обязателен через Secrets/env
+WHITE_URLS = [
+    "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt",
+    "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt",
+]
+BLACK_URLS = [
+    "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/BLACK_VLESS_RUS_mobile.txt",
+]
+EXTRA_URLS = [
+    "https://github.com/AvenCores/goida-vpn-configs/raw/refs/heads/main/githubmirror/26.txt",
+]
+
+TCP_TIMEOUT = 3.0
+SINGBOX_PORT_WAIT = 5.0          # сколько ждём открытия SOCKS-порта sing-box
+SINGBOX_CURL_TIMEOUT = 10.0
+MAX_FOR_SINGBOX = 500            # сколько лучших по TCP-пингу гоняем через sing-box
+MAX_SERVERS_PER_BALANCER = 100
+CONCURRENCY_LIMIT = min((os.cpu_count() or 4) * 4, 40)  # одновременных sing-box проверок
+BASE_TEST_PORT = 20000           # диапазон портов для тестовых SOCKS-инстансов
+VALID_FINGERPRINTS = {"chrome", "firefox", "edge", "safari", "ios", "android", "qq", "random"}
+EXCLUDE_PATTERN = re.compile(r"(Россия|anycast|Беларусь|🇷🇺|🇧🇾|Russia|Belarus)", re.IGNORECASE)
+
+_SECRET_PATTERN = re.compile(
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+    r"|(?<=://)[^@/\s]{10,}(?=@)"  # userinfo перед @ (пароли/base64-auth)
+)
 
 
-def fetch_url(url, timeout=15):
-    """
-    Скачивание через curl — самый надежный способ в GitHub Actions.
-    """
+def mask_secret(text: str) -> str:
+    """Маскирует UUID/пароли/ключи перед выводом в лог, чтобы не палить секреты в CI-логах."""
+    return _SECRET_PATTERN.sub("<REDACTED>", text)
+
+
+def log(msg: str) -> None:
+    print(mask_secret(msg))
+
+
+def log_err(msg: str) -> None:
+    print(mask_secret(msg), file=sys.stderr)
+
+
+# ============================================================================
+# Вспомогательные функции
+# ============================================================================
+
+def clean_fingerprint(fp: Optional[str]) -> str:
+    if not fp:
+        return "chrome"
+    cleaned = re.sub(r"[#|*].*", "", fp).strip().lower()
+    return cleaned if cleaned in VALID_FINGERPRINTS else "chrome"
+
+
+def is_excluded_region(remarks: str) -> bool:
+    return bool(remarks and EXCLUDE_PATTERN.search(remarks))
+
+
+def normalize_address(addr: str) -> str:
+    """Убирает квадратные скобки IPv6 для использования в socket/curl."""
+    if addr.startswith("[") and addr.endswith("]"):
+        return addr[1:-1]
+    return addr
+
+
+def bracket_if_ipv6(addr: str) -> str:
+    if ":" in addr and not addr.startswith("["):
+        return f"[{addr}]"
+    return addr
+
+
+async def fetch_url(url: str, timeout: float = 15.0) -> Optional[str]:
+    """Асинхронная загрузка через curl (без внешних зависимостей)."""
     try:
-        result = subprocess.run(
-            ['curl', '-sL', '--max-time', str(timeout), url],
-            capture_output=True, text=True, check=True
+        proc = await asyncio.create_subprocess_exec(
+            "curl", "-sL", "--max-time", str(int(timeout)), url,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         )
-        return result.stdout.strip()
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout + 5)
+        if proc.returncode != 0:
+            log_err(f"⚠️ curl вернул код {proc.returncode} для {url}: {stderr.decode(errors='ignore')[:200]}")
+            return None
+        return stdout.decode(errors="ignore").strip()
     except Exception as e:
-        print(f"⚠️ Ошибка загрузки {url} через curl: {e}", file=sys.stderr)
+        log_err(f"⚠️ Ошибка загрузки {url}: {e}")
         return None
 
 
-def clean_fingerprint(fp):
-    if not fp:
-        return 'chrome'
-    cleaned = re.sub(r'[#|*].*', '', fp).strip().lower()
-    return cleaned if cleaned in VALID_FINGERPRINTS else 'chrome'
-
-
-def is_russia_or_belarus(remarks):
-    if not remarks:
-        return False
-    return bool(EXCLUDE_PATTERN.search(remarks))
-
-
-def create_config_template(remarks_text):
+def create_config_template(remarks_text: str) -> Dict[str, Any]:
+    """Базовый шаблон sing-box конфига с балансировщиком."""
     return {
         "dns": {
             "servers": ["https://8.8.8.8/dns-query", "https://8.8.4.4/dns-query"],
-            "queryStrategy": "UseIP"
+            "queryStrategy": "UseIP",
         },
         "log": {"loglevel": "warning"},
         "inbounds": [
             {
-                "listen": "127.0.0.1",
-                "port": 10808,
-                "protocol": "socks",
+                "listen": "127.0.0.1", "port": 10808, "protocol": "socks",
                 "settings": {"auth": "noauth", "udp": True, "userLevel": 8},
                 "sniffing": {"destOverride": ["http", "tls"], "enabled": True, "routeOnly": False},
-                "tag": "socks"
+                "tag": "socks",
             },
             {
-                "listen": "127.0.0.1",
-                "port": 10809,
-                "protocol": "http",
-                "settings": {"userLevel": 8},
-                "tag": "http"
-            }
+                "listen": "127.0.0.1", "port": 10809, "protocol": "http",
+                "settings": {"userLevel": 8}, "tag": "http",
+            },
         ],
         "routing": {
             "domainStrategy": "IPIfNonMatch",
             "domainMatcher": "hybrid",
             "rules": [
                 {"type": "field", "protocol": ["bittorrent"], "outboundTag": "direct"},
-                {"type": "field", "network": "tcp,udp", "balancerTag": "WL_Balancer"}
+                {"type": "field", "network": "tcp,udp", "balancerTag": "WL_Balancer"},
             ],
             "balancers": [
                 {
-                    "tag": "WL_Balancer",
-                    "selector": [],
+                    "tag": "WL_Balancer", "selector": [],
                     "strategy": {
                         "type": "leastLoad",
                         "settings": {
-                            "maxRTT": "7s",
-                            "expected": 1,
-                            "baselines": ["500ms", "1500ms", "3000ms"],
-                            "tolerance": 0.1
-                        }
+                            "maxRTT": "10s", "expected": 1,
+                            "baselines": ["500ms", "1500ms", "3000ms"], "tolerance": 0.1,
+                        },
                     },
-                    "fallbackTag": "direct"
+                    "fallbackTag": "direct",
                 }
-            ]
+            ],
         },
         "burstObservatory": {
             "pingConfig": {
-                "timeout": "7s",
-                "interval": "1m",
-                "sampling": 2,
-                "destination": "http://www.gstatic.com/generate_204"
+                "timeout": "10s", "interval": "1m", "sampling": 2,
+                "destination": "http://www.gstatic.com/generate_204",
             },
-            "subjectSelector": []
+            "subjectSelector": [],
         },
         "outbounds": [],
-        "remarks": remarks_text
+        "remarks": remarks_text,
     }
 
 
-def parse_vless_url(raw_url):
-    """Безопасный парсинг VLESS URL."""
-    remarks = ''
-    url_str = raw_url.strip()
+def strip_balancer_for_empty(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Если рабочих конфигов нет — убираем balancer/burstObservatory, чтобы sing-box
+    не падал на валидации пустого selector, и направляем трафик в direct."""
+    config["routing"]["rules"] = [
+        {"type": "field", "protocol": ["bittorrent"], "outboundTag": "direct"},
+        {"type": "field", "network": "tcp,udp", "outboundTag": "direct"},
+    ]
+    config["routing"].pop("balancers", None)
+    config.pop("burstObservatory", None)
+    config["outbounds"] = [
+        {"protocol": "freedom", "settings": {"domainStrategy": "UseIP"}, "tag": "direct"},
+        {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"},
+    ]
+    return config
 
-    if '#' in url_str:
-        url_str, remarks = url_str.split('#', 1)
-        remarks = urllib.parse.unquote(remarks.strip())
 
-    if not url_str.startswith('vless://'):
-        return None, remarks
+# ============================================================================
+# Модульные обработчики протоколов (парсинг + генерация ссылки)
+# Каждый протокол — отдельный класс. Чтобы добавить протокол — реализуй
+# ProtocolHandler и зарегистрируй его в PROTOCOL_REGISTRY.
+# ============================================================================
 
-    try:
-        parsed = urllib.parse.urlparse(url_str)
-        user_id = parsed.username
-        address = parsed.hostname
-        port = parsed.port or 443
+@dataclass
+class ParsedProxy:
+    outbound: Dict[str, Any]
+    remarks: str
+    address: str
+    port: int
 
-        if not user_id or not address:
-            return None, remarks
 
-        query_params = urllib.parse.parse_qs(parsed.query)
-        params = {k: v[0] for k, v in query_params.items() if v}
+class ProtocolHandler(ABC):
+    scheme: str
 
-        fp_raw = params.get('fp') or params.get('fingerprint', 'chrome')
-        fingerprint = clean_fingerprint(fp_raw)
+    @abstractmethod
+    def parse(self, raw_url: str) -> Optional[ParsedProxy]: ...
 
-        is_reality = ('pbk' in params) or ('publicKey' in params) or (params.get('security') == 'reality')
+    @abstractmethod
+    def generate(self, outbound: Dict[str, Any], remarks: Optional[str]) -> Optional[str]: ...
 
-        outbound = {
-            "tag": None,
-            "protocol": "vless",
-            "settings": {
-                "vnext": [{
-                    "address": address,
-                    "port": port,
-                    "users": [{
-                        "id": user_id,
-                        "encryption": "none",
-                        "flow": params.get('flow', ''),
-                        "level": 8
+    @staticmethod
+    def split_remarks(raw_url: str) -> Tuple[str, str]:
+        url_str = raw_url.strip()
+        remarks = ""
+        if "#" in url_str:
+            url_str, remarks = url_str.split("#", 1)
+            remarks = urllib.parse.unquote(remarks.strip())
+        return url_str, remarks
+
+
+class VlessHandler(ProtocolHandler):
+    scheme = "vless://"
+
+    def parse(self, raw_url: str) -> Optional[ParsedProxy]:
+        url_str, remarks = self.split_remarks(raw_url)
+        if not url_str.startswith(self.scheme):
+            return None
+        try:
+            parsed = urllib.parse.urlparse(url_str)
+            user_id, address_raw, port = parsed.username, parsed.hostname, parsed.port or 443
+            if not user_id or not address_raw:
+                return None
+            address = normalize_address(address_raw)
+            params = {k: v[0] for k, v in urllib.parse.parse_qs(parsed.query).items() if v}
+            fingerprint = clean_fingerprint(params.get("fp") or params.get("fingerprint"))
+
+            is_reality = ("pbk" in params) or ("publicKey" in params) or (params.get("security") == "reality")
+            # Критичная проверка: без публичного ключа Reality-конфиг невалиден.
+            if is_reality and not (params.get("pbk") or params.get("publicKey")):
+                return None
+
+            outbound: Dict[str, Any] = {
+                "tag": None,
+                "protocol": "vless",
+                "settings": {
+                    "vnext": [{
+                        "address": address, "port": port,
+                        "users": [{"id": user_id, "encryption": "none",
+                                   "flow": params.get("flow", ""), "level": 8}],
                     }]
-                }]
-            },
-            "streamSettings": {
-                "network": params.get('type', 'tcp'),
-                "security": "reality" if is_reality else "tls",
-                "tcpSettings": {"header": {"type": "none"}}
+                },
+                "streamSettings": {
+                    "network": params.get("type", "tcp"),
+                    "security": "reality" if is_reality else "tls",
+                    "tcpSettings": {"header": {"type": "none"}},
+                },
             }
-        }
+            if is_reality:
+                outbound["streamSettings"]["realitySettings"] = {
+                    "allowInsecure": False, "fingerprint": fingerprint,
+                    "publicKey": params.get("pbk") or params.get("publicKey") or "",
+                    "serverName": params.get("sni", address),
+                    "shortId": params.get("sid", ""), "show": False,
+                }
+            else:
+                outbound["streamSettings"]["tlsSettings"] = {
+                    "allowInsecure": False, "serverName": params.get("sni", address),
+                    "fingerprint": fingerprint,
+                }
+            return ParsedProxy(outbound, remarks, address, port)
+        except Exception:
+            return None
 
-        if is_reality:
-            outbound["streamSettings"]["realitySettings"] = {
-                "allowInsecure": False,
-                "fingerprint": fingerprint,
-                "publicKey": params.get('pbk', '') or params.get('publicKey', ''),
-                "serverName": params.get('sni', address),
-                "shortId": params.get('sid', ''),
-                "show": False
+    def generate(self, outbound: Dict[str, Any], remarks: Optional[str]) -> Optional[str]:
+        try:
+            vnext = outbound["settings"]["vnext"][0]
+            address, port = vnext["address"], vnext["port"]
+            user = vnext["users"][0]
+            stream = outbound.get("streamSettings", {})
+            network, security = stream.get("network", "tcp"), stream.get("security", "")
+
+            params: Dict[str, str] = {"encryption": user.get("encryption", "none")}
+            if user.get("flow"):
+                params["flow"] = user["flow"]
+            if security:
+                params["security"] = security
+            if network != "tcp":
+                params["type"] = network
+
+            if security == "reality":
+                r = stream.get("realitySettings", {})
+                params.update({k: v for k, v in {
+                    "sni": r.get("serverName"), "fp": r.get("fingerprint"),
+                    "pbk": r.get("publicKey"), "sid": r.get("shortId"),
+                }.items() if v})
+            elif security == "tls":
+                t = stream.get("tlsSettings", {})
+                params.update({k: v for k, v in {
+                    "sni": t.get("serverName"), "fp": t.get("fingerprint"),
+                }.items() if v})
+
+            addr_out = bracket_if_ipv6(address)
+            url = f"vless://{user['id']}@{addr_out}:{port}"
+            if params:
+                url += "?" + "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items())
+            if remarks:
+                url += "#" + urllib.parse.quote(remarks)
+            return url
+        except Exception:
+            return None
+
+
+class Hysteria2Handler(ProtocolHandler):
+    scheme = "hysteria2://"
+
+    def parse(self, raw_url: str) -> Optional[ParsedProxy]:
+        url_str, remarks = self.split_remarks(raw_url)
+        if not url_str.startswith(self.scheme):
+            return None
+        try:
+            parsed = urllib.parse.urlparse(url_str)
+            auth, address_raw, port = parsed.username, parsed.hostname, parsed.port or 443
+            if not auth or not address_raw:
+                return None
+            address = normalize_address(address_raw)
+            params = urllib.parse.parse_qs(parsed.query)
+            sni = params.get("sni", [address])[0]
+            fingerprint = params.get("fingerprint", ["chrome"])[0]
+            insecure = params.get("insecure", ["0"])[0] == "1"
+            alpn = params.get("alpn", [None])[0]
+            alpn_list = alpn.split(",") if alpn else []
+
+            outbound = {
+                "tag": None, "protocol": "hysteria2",
+                "settings": {"servers": [{
+                    "address": address, "port": port, "auth": auth, "sni": sni,
+                    "fingerprint": fingerprint, "insecure": insecure, "alpn": alpn_list,
+                }]},
             }
-        else:
-            outbound["streamSettings"]["tlsSettings"] = {
-                "allowInsecure": False,
-                "serverName": params.get('sni', address),
-                "fingerprint": fingerprint
+            return ParsedProxy(outbound, remarks, address, port)
+        except Exception:
+            return None
+
+    def generate(self, outbound: Dict[str, Any], remarks: Optional[str]) -> Optional[str]:
+        try:
+            s = outbound["settings"]["servers"][0]
+            address, port, auth = s.get("address"), s.get("port"), s.get("auth")
+            if not (address and port and auth):
+                return None
+            params: Dict[str, str] = {}
+            if s.get("sni"):
+                params["sni"] = s["sni"]
+            if s.get("fingerprint"):
+                params["fingerprint"] = s["fingerprint"]
+            if s.get("insecure"):
+                params["insecure"] = "1"
+            if s.get("alpn"):
+                params["alpn"] = ",".join(s["alpn"])
+            addr_out = bracket_if_ipv6(address)
+            url = f"hysteria2://{auth}@{addr_out}:{port}"
+            if params:
+                url += "?" + "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items())
+            if remarks:
+                url += "#" + urllib.parse.quote(remarks)
+            return url
+        except Exception:
+            return None
+
+
+class TrojanHandler(ProtocolHandler):
+    scheme = "trojan://"
+
+    def parse(self, raw_url: str) -> Optional[ParsedProxy]:
+        url_str, remarks = self.split_remarks(raw_url)
+        if not url_str.startswith(self.scheme):
+            return None
+        try:
+            parsed = urllib.parse.urlparse(url_str)
+            password, address_raw, port = parsed.username, parsed.hostname, parsed.port or 443
+            if not password or not address_raw:
+                return None
+            address = normalize_address(address_raw)
+            params = urllib.parse.parse_qs(parsed.query)
+            outbound = {
+                "tag": None, "protocol": "trojan",
+                "settings": {"servers": [{
+                    "address": address, "port": port, "password": password,
+                    "sni": params.get("sni", [address])[0],
+                    "fingerprint": params.get("fingerprint", ["chrome"])[0],
+                    "allowInsecure": params.get("allowInsecure", ["0"])[0] == "1",
+                }]},
             }
+            return ParsedProxy(outbound, remarks, address, port)
+        except Exception:
+            return None
 
-        return outbound, remarks
+    def generate(self, outbound: Dict[str, Any], remarks: Optional[str]) -> Optional[str]:
+        try:
+            s = outbound["settings"]["servers"][0]
+            address, port, password = s.get("address"), s.get("port"), s.get("password")
+            if not (address and port and password):
+                return None
+            params = {}
+            if s.get("sni"):
+                params["sni"] = s["sni"]
+            if s.get("fingerprint"):
+                params["fingerprint"] = s["fingerprint"]
+            if s.get("allowInsecure"):
+                params["allowInsecure"] = "1"
+            addr_out = bracket_if_ipv6(address)
+            url = f"trojan://{password}@{addr_out}:{port}"
+            if params:
+                url += "?" + "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items())
+            if remarks:
+                url += "#" + urllib.parse.quote(remarks)
+            return url
+        except Exception:
+            return None
 
-    except Exception:
-        return None, remarks
+
+class ShadowsocksHandler(ProtocolHandler):
+    scheme = "ss://"
+
+    def parse(self, raw_url: str) -> Optional[ParsedProxy]:
+        url_str, remarks = self.split_remarks(raw_url)
+        if not url_str.startswith(self.scheme):
+            return None
+        try:
+            content = url_str[len(self.scheme):]
+            if "@" in content:
+                userinfo, hostport = content.split("@", 1)
+                decoded = base64.urlsafe_b64decode(userinfo + "=" * (-len(userinfo) % 4)).decode()
+                method, password = decoded.split(":", 1)
+            else:
+                decoded = base64.urlsafe_b64decode(content + "=" * (-len(content) % 4)).decode()
+                userinfo, hostport = decoded.split("@", 1)
+                method, password = userinfo.split(":", 1)
+            address_raw, port_str = hostport.rsplit(":", 1)
+            address, port = normalize_address(address_raw), int(port_str)
+
+            outbound = {
+                "tag": None, "protocol": "shadowsocks",
+                "settings": {"servers": [{
+                    "address": address, "port": port, "method": method, "password": password,
+                }]},
+            }
+            return ParsedProxy(outbound, remarks, address, port)
+        except Exception:
+            return None
+
+    def generate(self, outbound: Dict[str, Any], remarks: Optional[str]) -> Optional[str]:
+        try:
+            s = outbound["settings"]["servers"][0]
+            address, port = s.get("address"), s.get("port")
+            method, password = s.get("method"), s.get("password")
+            if not all([address, port, method, password]):
+                return None
+            b64 = base64.urlsafe_b64encode(f"{method}:{password}".encode()).decode().rstrip("=")
+            addr_out = bracket_if_ipv6(address)
+            url = f"ss://{b64}@{addr_out}:{port}"
+            if remarks:
+                url += "#" + urllib.parse.quote(remarks)
+            return url
+        except Exception:
+            return None
 
 
-def get_vless_links(urls_list):
-    """Вспомогательная функция для массового скачивания VLESS ссылок из списка URL"""
-    all_links = []
-    for url in urls_list:
-        print(f"📥 Скачиваем список: {url}")
-        content = fetch_url(url)
+class VmessHandler(ProtocolHandler):
+    scheme = "vmess://"
+
+    def parse(self, raw_url: str) -> Optional[ParsedProxy]:
+        url_str, remarks = self.split_remarks(raw_url)
+        if not url_str.startswith(self.scheme):
+            return None
+        try:
+            b64 = url_str[len(self.scheme):]
+            b64 += "=" * (-len(b64) % 4)
+            cfg = json.loads(base64.urlsafe_b64decode(b64).decode())
+            address, uuid = cfg.get("add", ""), cfg.get("id", "")
+            if not address or not uuid:
+                return None
+            port = int(cfg.get("port", 443))
+            address = normalize_address(address)
+            network, tls = cfg.get("net", "tcp"), cfg.get("tls", "")
+
+            outbound: Dict[str, Any] = {
+                "tag": None, "protocol": "vmess",
+                "settings": {"vnext": [{
+                    "address": address, "port": port,
+                    "users": [{"id": uuid, "alterId": int(cfg.get("aid", 0)),
+                               "security": cfg.get("scy", "auto"), "level": 8}],
+                }]},
+                "streamSettings": {"network": network, "security": "tls" if tls == "tls" else "none"},
+            }
+            host, path = cfg.get("host", ""), cfg.get("path", "")
+            if network == "ws":
+                ws = {"path": path}
+                if host:
+                    ws["headers"] = {"Host": host}
+                outbound["streamSettings"]["wsSettings"] = ws
+            elif network == "grpc":
+                outbound["streamSettings"]["grpcSettings"] = {"serviceName": path.lstrip("/")}
+            if tls == "tls":
+                outbound["streamSettings"]["tlsSettings"] = {
+                    "serverName": cfg.get("sni") or address,
+                    "fingerprint": clean_fingerprint(cfg.get("fp")),
+                    "allowInsecure": False,
+                }
+            return ParsedProxy(outbound, remarks, address, port)
+        except Exception:
+            return None
+
+    def generate(self, outbound: Dict[str, Any], remarks: Optional[str]) -> Optional[str]:
+        try:
+            vnext = outbound["settings"]["vnext"][0]
+            user = vnext["users"][0]
+            stream = outbound.get("streamSettings", {})
+            network, tls = stream.get("network", "tcp"), stream.get("security", "none")
+            cfg = {
+                "v": "2", "ps": remarks or "", "add": vnext["address"], "port": vnext["port"],
+                "id": user["id"], "aid": user.get("alterId", 0), "scy": user.get("security", "auto"),
+                "net": network, "type": "none", "host": "", "path": "",
+                "tls": "tls" if tls == "tls" else "", "sni": "", "fp": "chrome",
+            }
+            if network == "ws":
+                ws = stream.get("wsSettings", {})
+                cfg["path"] = ws.get("path", "")
+                cfg["host"] = ws.get("headers", {}).get("Host", "")
+            elif network == "grpc":
+                cfg["path"] = stream.get("grpcSettings", {}).get("serviceName", "")
+            if tls == "tls":
+                t = stream.get("tlsSettings", {})
+                cfg["sni"], cfg["fp"] = t.get("serverName", ""), t.get("fingerprint", "chrome")
+            b64 = base64.urlsafe_b64encode(json.dumps(cfg).encode()).decode().rstrip("=")
+            url = f"vmess://{b64}"
+            if remarks:
+                url += "#" + urllib.parse.quote(remarks)
+            return url
+        except Exception:
+            return None
+
+
+PROTOCOL_REGISTRY: List[ProtocolHandler] = [
+    VlessHandler(), Hysteria2Handler(), TrojanHandler(), ShadowsocksHandler(), VmessHandler(),
+]
+
+
+def parse_proxy_url(raw_url: str) -> Optional[ParsedProxy]:
+    url = raw_url.strip()
+    for handler in PROTOCOL_REGISTRY:
+        if url.startswith(handler.scheme):
+            return handler.parse(url)
+    return None
+
+
+def generate_link(outbound: Dict[str, Any], remarks: Optional[str]) -> Optional[str]:
+    protocol = outbound.get("protocol")
+    for handler in PROTOCOL_REGISTRY:
+        if handler.scheme.rstrip("://") == protocol:
+            return handler.generate(outbound, remarks)
+    return None
+
+
+async def get_links_from_urls(urls: List[str]) -> List[str]:
+    all_links: List[str] = []
+    schemes = tuple(h.scheme for h in PROTOCOL_REGISTRY)
+    for url in urls:
+        log(f"📥 Скачиваем список: {url}")
+        content = await fetch_url(url)
         if content:
             for line in content.splitlines():
                 line = line.strip()
-                if line.startswith('vless://'):
+                if line.startswith(schemes):
                     all_links.append(line)
-    
-    # Возвращаем очищенный список без дубликатов
     return list(dict.fromkeys(all_links))
 
 
-# ----- Функции для обратного преобразования outbound → ссылка -----
-def generate_vless_url(outbound, remarks=None):
-    """Генерирует VLESS URL из outbound-объекта."""
+# ============================================================================
+# Проверка: TCP-пинг + реальный тест через sing-box (полностью асинхронно)
+# ============================================================================
+
+async def tcp_ping(host: str, port: int, timeout: float = TCP_TIMEOUT) -> Optional[float]:
+    start = time.monotonic()
     try:
-        settings = outbound['settings']
-        vnext = settings['vnext'][0]
-        address = vnext['address']
-        port = vnext['port']
-        user = vnext['users'][0]
-        user_id = user['id']
-        encryption = user.get('encryption', 'none')
-        flow = user.get('flow', '')
-
-        stream = outbound.get('streamSettings', {})
-        network = stream.get('network', 'tcp')
-        security = stream.get('security', '')
-
-        params = {}
-        params['encryption'] = encryption
-        if flow:
-            params['flow'] = flow
-        if security:
-            params['security'] = security
-        if network != 'tcp':
-            params['type'] = network
-
-        # reality / tls
-        if security == 'reality':
-            reality = stream.get('realitySettings', {})
-            if 'serverName' in reality:
-                params['sni'] = reality['serverName']
-            if 'fingerprint' in reality:
-                params['fp'] = reality['fingerprint']
-            if 'publicKey' in reality:
-                params['pbk'] = reality['publicKey']
-            if 'shortId' in reality:
-                params['sid'] = reality['shortId']
-        elif security == 'tls':
-            tls = stream.get('tlsSettings', {})
-            if 'serverName' in tls:
-                params['sni'] = tls['serverName']
-            if 'fingerprint' in tls:
-                params['fp'] = tls['fingerprint']
-
-        # Прочие параметры из streamSettings (не вложенные)
-        for key, value in stream.items():
-            if key not in ['network', 'security', 'realitySettings', 'tlsSettings',
-                           'tcpSettings', 'wsSettings', 'grpcSettings', 'httpSettings', 'xhttpSettings']:
-                if isinstance(value, (str, int, bool)):
-                    params[key] = str(value).lower() if isinstance(value, bool) else str(value)
-
-        # Специфика для ws, grpc, xhttp
-        if network == 'ws':
-            ws = stream.get('wsSettings', {})
-            if 'path' in ws:
-                params['path'] = ws['path']
-            if 'headers' in ws and isinstance(ws['headers'], dict):
-                if 'Host' in ws['headers']:
-                    params['host'] = ws['headers']['Host']
-        elif network == 'grpc':
-            grpc = stream.get('grpcSettings', {})
-            if 'serviceName' in grpc:
-                params['serviceName'] = grpc['serviceName']
-        elif network == 'xhttp':
-            xhttp = stream.get('xhttpSettings', {})
-            if 'path' in xhttp:
-                params['path'] = xhttp['path']
-            if 'host' in xhttp:
-                params['host'] = xhttp['host']
-            if 'mode' in xhttp:
-                params['mode'] = xhttp['mode']
-
-        # Сборка URL
-        base = f"vless://{user_id}@{address}:{port}"
-        if params:
-            query = '&'.join([f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items() if v])
-            base += '?' + query
-        if remarks:
-            base += '#' + urllib.parse.quote(remarks)
-        return base
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=timeout)
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+        return time.monotonic() - start
     except Exception:
         return None
 
 
-def generate_hysteria2_url(outbound, remarks=None):
-    """Генерирует Hysteria2 URL из outbound-объекта."""
-    try:
-        settings = outbound['settings']
-        # Поддерживаем два возможных формата: {servers: [...]} или прямо {address, port, ...}
-        if 'servers' in settings and settings['servers']:
-            server = settings['servers'][0]
-            address = server.get('address')
-            port = server.get('port')
-            auth = server.get('auth') or server.get('password') or settings.get('auth')
-        else:
-            address = settings.get('address')
-            port = settings.get('port')
-            auth = settings.get('auth') or settings.get('password') or settings.get('id')
-        if not address or not port or not auth:
+async def _wait_for_port(host: str, port: int, deadline: float) -> bool:
+    """Активный poll порта вместо ненадёжного sleep — устраняет race condition
+    запуска sing-box на медленных CI-раннерах."""
+    start = time.monotonic()
+    while time.monotonic() - start < deadline:
+        try:
+            reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=0.5)
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+            return True
+        except Exception:
+            await asyncio.sleep(0.2)
+    return False
+
+
+async def check_via_singbox(outbound: Dict[str, Any], test_port: int,
+                             timeout: float = SINGBOX_CURL_TIMEOUT) -> Optional[float]:
+    """Поднимает изолированный sing-box с единственным outbound'ом и проверяет
+    его реальным HTTP-запросом через SOCKS5. Возвращает RTT или None."""
+    if shutil.which("sing-box") is None:
+        log_err("❌ Бинарник sing-box не найден в PATH — проверка невозможна")
+        return None
+
+    outbound_copy = json.loads(json.dumps(outbound))
+    # КРИТИЧНОЕ ИСПРАВЛЕНИЕ: тег обязан быть непустой строкой, иначе routing
+    # получит null и sing-box не сможет промаршрутизировать трафик.
+    outbound_copy["tag"] = "proxy"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_path = os.path.join(tmpdir, "config.json")
+        config = {
+            "log": {"loglevel": "error"},
+            "inbounds": [{"type": "socks", "tag": "socks-in", "listen": "127.0.0.1", "port": test_port}],
+            "outbounds": [outbound_copy],
+            "route": {"rules": [{"outbound": "proxy", "network": "tcp"}]},
+        }
+        with open(config_path, "w") as f:
+            json.dump(config, f)
+
+        proc = None
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "sing-box", "run", "-c", config_path,
+                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+            )
+
+            port_ready = await _wait_for_port("127.0.0.1", test_port, SINGBOX_PORT_WAIT)
+            if not port_ready:
+                return None
+
+            curl_proc = await asyncio.create_subprocess_exec(
+                "curl", "-s", "-o", "/dev/null", "-w", "%{time_total}",
+                "--socks5", f"127.0.0.1:{test_port}", "--max-time", str(int(timeout)),
+                "--retry", "1", "--retry-delay", "1", "--retry-connrefused",
+                "http://www.gstatic.com/generate_204",
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+            )
+            try:
+                stdout, _ = await asyncio.wait_for(curl_proc.communicate(), timeout=timeout + 5)
+            except asyncio.TimeoutError:
+                curl_proc.kill()
+                return None
+
+            if curl_proc.returncode == 0:
+                try:
+                    return float(stdout.decode().strip())
+                except ValueError:
+                    return None
             return None
-
-        params = {}
-        # Извлекаем sni, fingerprint, alpn, insecure
-        for key in ['sni', 'fingerprint', 'insecure']:
-            val = settings.get(key)
-            if val is None and 'servers' in settings:
-                val = server.get(key)
-            if val is not None:
-                if key == 'insecure':
-                    params['insecure'] = '1' if val else '0'
-                else:
-                    params[key] = str(val)
-
-        # alpn может быть списком
-        alpn = settings.get('alpn')
-        if alpn is None and 'servers' in settings:
-            alpn = server.get('alpn')
-        if alpn:
-            if isinstance(alpn, list):
-                alpn = ','.join(alpn)
-            params['alpn'] = alpn
-
-        base = f"hysteria2://{auth}@{address}:{port}"
-        if params:
-            query = '&'.join([f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items() if v])
-            base += '?' + query
-        if remarks:
-            base += '#' + urllib.parse.quote(remarks)
-        return base
-    except Exception:
-        return None
+        except Exception:
+            return None
+        finally:
+            if proc is not None:
+                try:
+                    proc.terminate()
+                    await asyncio.wait_for(proc.wait(), timeout=2)
+                except Exception:
+                    try:
+                        proc.kill()
+                        await proc.wait()
+                    except Exception:
+                        pass
 
 
-def generate_link(outbound, remarks=None):
-    """Универсальная функция: генерирует ссылку для поддерживаемых протоколов."""
-    protocol = outbound.get('protocol')
-    if protocol == 'vless':
-        return generate_vless_url(outbound, remarks)
-    elif protocol == 'hysteria2':
-        return generate_hysteria2_url(outbound, remarks)
-    else:
-        return None
+@dataclass
+class Candidate:
+    outbound: Dict[str, Any]
+    remarks: str
+    address: str
+    port: int
+    rtt: float = field(default=0.0)
 
 
-def main():
-    print("📥 Загрузка платной подписки...")
-    paid_sub_url = 'https://connliberty.com/connection/subs/22a12228-aa7d-4f34-a7cd-b617a8f61c20'
-    paid_sub_raw = fetch_url(paid_sub_url)
-    existing_configs = []
+_port_counter = 0
+_port_lock = asyncio.Lock()
 
-    if paid_sub_raw:
-        try:
-            parsed_json = json.loads(paid_sub_raw)
-            if isinstance(parsed_json, list):
-                existing_configs = parsed_json
-        except json.JSONDecodeError:
-            print("⚠️ Ошибка парсинга JSON платной подписки", file=sys.stderr)
 
-    # ЗАЩИТА: Восстановление старых конфигов
-    if not existing_configs:
-        print("⚠️ Не удалось загрузить платную подписку по сети. Пробуем восстановить из прошлых данных...")
-        try:
-            with open('subscription.json', 'r', encoding='utf-8') as f:
-                old_file_data = json.load(f)
-                if isinstance(old_file_data, list):
-                    # Исключаем все ранее сгенерированные балансировщики (по эмодзи и старому названию)
-                    exclude_prefixes = ('🏳️list', '🏴list')
-                    existing_configs = [
-                        c for c in old_file_data 
-                        if isinstance(c, dict) and not c.get('remarks', '').startswith(exclude_prefixes)
-                    ]
-                    print(f"🔄 Загружено {len(existing_configs)} платных конфигов из сохраненного subscription.json")
-        except Exception as e:
-            print(f"⚠️ Не удалось прочитать прошлый subscription.json: {e}")
+async def _next_test_port() -> int:
+    global _port_counter
+    async with _port_lock:
+        port = BASE_TEST_PORT + (_port_counter % 5000)
+        _port_counter += 1
+        return port
 
-    # ==========================
-    # СОРТИРОВКА: конфиги с "обход" или "бс" в начало
-    # ==========================
-    obhod_keywords = ['обход', 'бс']
-    obhod_configs = []
-    other_configs = []
-    for cfg in existing_configs:
-        remarks = cfg.get('remarks', '')
-        if any(kw in remarks.lower() for kw in obhod_keywords):
-            obhod_configs.append(cfg)
-        else:
-            other_configs.append(cfg)
-    existing_configs = obhod_configs + other_configs
-    print(f"🔀 Перемещено {len(obhod_configs)} конфигов обхода (с 'обход' или 'БС') в начало")
 
-    print(f"Итого платных конфигов: {len(existing_configs)}\n")
+async def check_and_create_balancer(
+    parsed_candidates: List[ParsedProxy],
+    source_name: str,
+    max_servers: int = MAX_SERVERS_PER_BALANCER,
+    remarks_ok_template: str = "✅ {name} (рабочих: {count})",
+    remarks_fail: str = "⛔ Временно не работает",
+) -> Dict[str, Any]:
+    log(f"\n🔍 Проверка источника: {source_name} (всего {len(parsed_candidates)} конфигов)")
+    fail_config = strip_balancer_for_empty(create_config_template(remarks_fail))
 
-    # ==========================
-    # ОБРАБОТКА БЕЛЫХ СПИСКОВ
-    # ==========================
-    white_urls = [
-        "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt",
-        "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt"
+    if not parsed_candidates:
+        return fail_config
+
+    # Этап 1: параллельный TCP-пинг (дёшево, отсекает явно мёртвые адреса)
+    ping_tasks = [tcp_ping(p.address, p.port) for p in parsed_candidates]
+    ping_results = await asyncio.gather(*ping_tasks, return_exceptions=False)
+    alive = [
+        Candidate(p.outbound, p.remarks, p.address, p.port, rtt)
+        for p, rtt in zip(parsed_candidates, ping_results) if rtt is not None
     ]
-    
-    white_links = get_vless_links(white_urls)
-    print(f"Найдено {len(white_links)} уникальных ссылок (Белые списки)")
+    log(f"   ✅ После TCP-пинга: {len(alive)} живых")
+    if not alive:
+        return fail_config
 
-    white_parsed = []
-    for link in white_links:
-        ob, rem = parse_vless_url(link)
-        if ob is not None:
-            white_parsed.append((ob, rem))
+    alive.sort(key=lambda c: c.rtt)
+    shortlist = alive[:MAX_FOR_SINGBOX]
+    log(f"   🔍 Для sing-box отобрано {len(shortlist)} лучших по TCP")
 
-    wl_outbounds_all = []
-    wl_tags_all = []
-    wl_outbounds_noru = []
-    wl_tags_noru = []
+    # Этап 2: реальная проверка через sing-box, с ограничением параллелизма
+    semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
 
-    for idx, (ob, rem) in enumerate(white_parsed, start=1):
-        tag = f"proxy-wl-{idx}"
-        
-        ob_copy = json.loads(json.dumps(ob))
-        ob_copy['tag'] = tag
-        wl_outbounds_all.append(ob_copy)
-        wl_tags_all.append(tag)
+    async def _bounded_check(cand: Candidate) -> Tuple[Candidate, Optional[float]]:
+        async with semaphore:
+            port = await _next_test_port()
+            rtt = await check_via_singbox(cand.outbound, port)
+            return cand, rtt
 
-        if not is_russia_or_belarus(rem):
-            wl_outbounds_noru.append(ob_copy)
-            wl_tags_noru.append(tag)
+    log(f"   🚀 Проверяем через sing-box (до {CONCURRENCY_LIMIT} параллельно)...")
+    results = await asyncio.gather(*[_bounded_check(c) for c in shortlist])
+    successful = [(c, rtt) for c, rtt in results if rtt is not None]
+    log(f"   ✅ Успешно через sing-box: {len(successful)}")
+    if not successful:
+        return fail_config
 
-    # ==========================
-    # ОБРАБОТКА ЧЕРНОГО СПИСКА
-    # ==========================
-    print("\n")
-    black_urls = [
-        "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/BLACK_VLESS_RUS_mobile.txt"
-    ]
-    
-    black_links = get_vless_links(black_urls)
-    print(f"Найдено {len(black_links)} уникальных ссылок (Черные списки)")
+    successful.sort(key=lambda pair: pair[1])
+    best = successful[:max_servers]
+    log(f"   🏆 Отобрано {len(best)} лучших для балансировщика")
 
-    black_parsed = []
-    for link in black_links:
-        ob, rem = parse_vless_url(link)
-        if ob is not None:
-            black_parsed.append((ob, rem))
+    outbounds, tags = [], []
+    for idx, (cand, _rtt) in enumerate(best, start=1):
+        tag = f"{source_name}-{idx}"
+        ob_copy = json.loads(json.dumps(cand.outbound))
+        ob_copy["tag"] = tag
+        outbounds.append(ob_copy)
+        tags.append(tag)
 
-    bl_outbounds = []
-    bl_tags = []
-
-    for idx, (ob, rem) in enumerate(black_parsed, start=1):
-        tag = f"proxy-bl-{idx}"
-        
-        ob_copy = json.loads(json.dumps(ob))
-        ob_copy['tag'] = tag
-        bl_outbounds.append(ob_copy)
-        bl_tags.append(tag)
-
-    # ==========================
-    # СБОРКА ИТОГОВЫХ КОНФИГОВ
-    # ==========================
-    direct_block = [
+    config = create_config_template(remarks_ok_template.format(name=source_name, count=len(best)))
+    config["outbounds"] = outbounds + [
         {"protocol": "freedom", "settings": {"domainStrategy": "UseIP"}, "tag": "direct"},
-        {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"}
+        {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"},
     ]
+    config["routing"]["balancers"][0]["selector"] = tags
+    config["burstObservatory"]["subjectSelector"] = tags
+    return config
 
-    # 1. Белый список (Все)
-    config_wl_all = create_config_template("🏳️list [LTE]")
-    config_wl_all['outbounds'] = wl_outbounds_all + direct_block
-    config_wl_all['routing']['balancers'][0]['selector'] = wl_tags_all
-    config_wl_all['burstObservatory']['subjectSelector'] = wl_tags_all
 
-    # 2. Белый список (Без RU/BY)
-    config_wl_noru = create_config_template("🏳️list [LTE] NoRU/BY")
-    config_wl_noru['outbounds'] = wl_outbounds_noru + direct_block
-    config_wl_noru['routing']['balancers'][0]['selector'] = wl_tags_noru
-    config_wl_noru['burstObservatory']['subjectSelector'] = wl_tags_noru
+# ============================================================================
+# Загрузка платной подписки (JSON конфигов ИЛИ base64-список ссылок)
+# ============================================================================
 
-    # 3. Черный список
-    config_bl = create_config_template("🏴list [wifi]")
-    if bl_outbounds:
-        config_bl['outbounds'] = bl_outbounds + direct_block
-        config_bl['routing']['balancers'][0]['selector'] = bl_tags
-        config_bl['burstObservatory']['subjectSelector'] = bl_tags
-    else:
-        config_bl['outbounds'] = direct_block
+async def load_paid_subscription() -> List[Dict[str, Any]]:
+    if not PAID_SUB_URL:
+        log_err("⚠️ PAID_SUB_URL не задан в переменных окружения — платная подписка пропущена")
+    raw = await fetch_url(PAID_SUB_URL) if PAID_SUB_URL else None
+    configs: List[Dict[str, Any]] = []
 
-    # Объединяем все сгенерированные балансировщики и платные конфиги
-    final_configs = [config_wl_all, config_wl_noru, config_bl] + existing_configs
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                configs = parsed
+        except json.JSONDecodeError:
+            # Fallback: возможно, это base64 со списком ссылок, а не готовый JSON.
+            try:
+                decoded = base64.b64decode(raw).decode("utf-8")
+                outbounds = []
+                for line in decoded.splitlines():
+                    parsed_proxy = parse_proxy_url(line.strip())
+                    if parsed_proxy:
+                        outbounds.append(parsed_proxy.outbound)
+                if outbounds:
+                    cfg = strip_balancer_for_empty(create_config_template("💎 Платная подписка"))
+                    cfg["outbounds"] = outbounds + cfg["outbounds"]
+                    configs = [cfg]
+            except Exception:
+                log_err("⚠️ Не удалось распознать формат платной подписки (ни JSON, ни base64)")
 
-    # Сохранение в subscription.json
-    with open('subscription.json', 'w', encoding='utf-8') as f:
+    if not configs:
+        log("⚠️ Восстановление платных конфигов из локального subscription.json...")
+        try:
+            with open("subscription.json", "r", encoding="utf-8") as f:
+                old = json.load(f)
+            if isinstance(old, list):
+                exclude_prefixes = ("🏳️list", "🏴list", "✅", "⛔", "📦")
+                configs = [c for c in old if isinstance(c, dict) and not c.get("remarks", "").startswith(exclude_prefixes)]
+                log(f"🔄 Восстановлено {len(configs)} платных конфигов")
+        except Exception as e:
+            log_err(f"⚠️ Не удалось прочитать сохранённый subscription.json: {e}")
+
+    # "Обход"/"бс" — приоритетные конфиги в начало списка
+    priority_kw = ("обход", "бс")
+    priority = [c for c in configs if any(kw in c.get("remarks", "").lower() for kw in priority_kw)]
+    rest = [c for c in configs if c not in priority]
+    return priority + rest
+
+
+# ============================================================================
+# main
+# ============================================================================
+
+async def main_async() -> None:
+    existing_configs = await load_paid_subscription()
+    log(f"Итого платных конфигов: {len(existing_configs)}\n")
+
+    white_links, black_links, extra_links = await asyncio.gather(
+        get_links_from_urls(WHITE_URLS),
+        get_links_from_urls(BLACK_URLS),
+        get_links_from_urls(EXTRA_URLS),
+    )
+    log(f"Найдено ссылок: белые={len(white_links)}, чёрные={len(black_links)}, extra={len(extra_links)}")
+
+    def parse_all(links: List[str]) -> List[ParsedProxy]:
+        out = []
+        for link in links:
+            p = parse_proxy_url(link)
+            if p is not None:
+                out.append(p)
+        return out
+
+    white_parsed = parse_all(white_links)
+    black_parsed = parse_all(black_links)
+    extra_parsed = parse_all(extra_links)
+    white_without_ru = [p for p in white_parsed if not is_excluded_region(p.remarks)]
+
+    config_white_all, config_white_noru, config_black, config_extra = await asyncio.gather(
+        check_and_create_balancer(white_parsed, "Белый список (все)", 100,
+                                   "🏳️list [LTE] ✅ {name} (рабочих: {count})",
+                                   "🏳️list [LTE] ⛔ Временно не работает"),
+        check_and_create_balancer(white_without_ru, "Белый список (без RU/BY)", 100,
+                                   "🏳️list [LTE] NoRU/BY ✅ {name} (рабочих: {count})",
+                                   "🏳️list [LTE] NoRU/BY ⛔ Временно не работает"),
+        check_and_create_balancer(black_parsed, "Чёрный список", 100,
+                                   "🏴list [wifi] ✅ {name} (рабочих: {count})",
+                                   "🏴list [wifi] ⛔ Временно не работает"),
+        check_and_create_balancer(extra_parsed, "26.txt", 100,
+                                   "📦 extra list (26.txt) ✅ {name} (рабочих: {count})",
+                                   "📦 extra list (26.txt) ⛔ Временно не работает"),
+    )
+
+    final_configs = [config_white_all, config_white_noru, config_black, config_extra] + existing_configs
+    with open("subscription.json", "w", encoding="utf-8") as f:
+        json.dump(final_configs, f, indent=2, ensure_ascii=False)
+    with open("subscription.txt", "w", encoding="utf-8") as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
 
-    # Сохранение в subscription.txt (такой же JSON, но в текстовом файле)
-    with open('subscription.txt', 'w', encoding='utf-8') as f:
-        json.dump(final_configs, f, indent=2, ensure_ascii=False)
-
-    # ==========================
-    # ГЕНЕРАЦИЯ ССЫЛОК ДЛЯ KARING (из платной подписки)
-    # ==========================
-    all_links = []
+    all_links: List[str] = []
     for cfg in existing_configs:
-        remarks = cfg.get('remarks', '')
-        for ob in cfg.get('outbounds', []):
+        remarks = cfg.get("remarks", "")
+        for ob in cfg.get("outbounds", []):
             link = generate_link(ob, remarks)
             if link:
                 all_links.append(link)
-
-    # Удаляем дубликаты
     all_links = list(dict.fromkeys(all_links))
+    with open("sub2.txt", "w", encoding="utf-8") as f:
+        f.write("\n".join(all_links))
+    with open("sub2.json", "w", encoding="utf-8") as f:
+        f.write("\n".join(all_links))
 
-    # Оба файла – plain text, без JSON-разметки
-    with open('sub2.txt', 'w', encoding='utf-8') as f:
-        f.write('\n'.join(all_links))
-    with open('sub2.json', 'w', encoding='utf-8') as f:
-        f.write('\n'.join(all_links))
+    def selector_len(cfg: Dict[str, Any]) -> int:
+        return len(cfg.get("routing", {}).get("balancers", [{}])[0].get("selector", []))
 
-    print("\n✅ Успешно обновлено!")
-    print(f"   • Серверов в белом списке (Все): {len(wl_tags_all)}")
-    print(f"   • Серверов в белом списке (NoRU/BY): {len(wl_tags_noru)}")
-    print(f"   • Серверов в черном списке: {len(bl_tags)}")
-    print(f"   • Всего записей в файле подписки: {len(final_configs)}")
-    print(f"   • Ссылок для Karing из платной подписки: {len(all_links)}")
-    print("   • Результат сохранён в subscription.json, subscription.txt, sub2.txt, sub2.json")
+    log("\n✅ Успешно обновлено!")
+    log(f"   • Белый список (все): {selector_len(config_white_all)} рабочих")
+    log(f"   • Белый список (без RU/BY): {selector_len(config_white_noru)} рабочих")
+    log(f"   • Чёрный список: {selector_len(config_black)} рабочих")
+    log(f"   • extra список (26.txt): {selector_len(config_extra)} рабочих")
+    log(f"   • Всего записей в subscription.json: {len(final_configs)}")
+    log(f"   • Ссылок для Karing: {len(all_links)}")
 
 
-if __name__ == '__main__':
+def main() -> None:
+    try:
+        asyncio.run(main_async())
+    except Exception as e:
+        # Никогда не печатаем полный traceback — он может содержать секреты из URL.
+        log_err(f"❌ Критическая ошибка: {mask_secret(str(e))}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
     main()
