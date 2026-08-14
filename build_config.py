@@ -363,6 +363,21 @@ def main():
         except Exception as e:
             print(f"⚠️ Не удалось прочитать прошлый subscription.json: {e}")
 
+    # ==========================
+    # СОРТИРОВКА: конфиги с "обход" или "бс" в начало
+    # ==========================
+    obhod_keywords = ['обход', 'бс']
+    obhod_configs = []
+    other_configs = []
+    for cfg in existing_configs:
+        remarks = cfg.get('remarks', '')
+        if any(kw in remarks.lower() for kw in obhod_keywords):
+            obhod_configs.append(cfg)
+        else:
+            other_configs.append(cfg)
+    existing_configs = obhod_configs + other_configs
+    print(f"🔀 Перемещено {len(obhod_configs)} конфигов обхода (с 'обход' или 'БС') в начало")
+
     print(f"Итого платных конфигов: {len(existing_configs)}\n")
 
     # ==========================
@@ -481,13 +496,11 @@ def main():
     # Удаляем дубликаты
     all_links = list(dict.fromkeys(all_links))
 
-    # Сохраняем в sub2.txt (построчно)
+    # Оба файла – plain text, без JSON-разметки
     with open('sub2.txt', 'w', encoding='utf-8') as f:
         f.write('\n'.join(all_links))
-
-    # Сохраняем в sub2.json (массив ссылок)
     with open('sub2.json', 'w', encoding='utf-8') as f:
-        json.dump(all_links, f, indent=2, ensure_ascii=False)
+        f.write('\n'.join(all_links))
 
     print("\n✅ Успешно обновлено!")
     print(f"   • Серверов в белом списке (Все): {len(wl_tags_all)}")
