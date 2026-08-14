@@ -58,9 +58,9 @@ def create_config_template(remarks_text):
                     "strategy": {
                         "type": "leastLoad",
                         "settings": {
-                            "maxRTT": "3s",
+                            "maxRTT": "5s",          # вернул 5s
                             "expected": 1,
-                            "baselines": ["300ms", "600ms"],
+                            "baselines": ["500ms", "1000ms"],  # вернул как в примере
                             "tolerance": 0
                         }
                     },
@@ -70,8 +70,8 @@ def create_config_template(remarks_text):
         },
         "burstObservatory": {
             "pingConfig": {
-                "timeout": "3s",
-                "interval": "2m",
+                "timeout": "5s",          # 5 секунд на проверку (не 3, не 25)
+                "interval": "5m",         # каждые 5 минут (как в примере)
                 "sampling": 1,
                 "destination": "http://www.gstatic.com/generate_204"
             },
@@ -102,10 +102,17 @@ def parse_vless_url(url):
     user_id = user_parts[0]
 
     if ':' in hostport:
-        address, port = hostport.split(':')
+        address, port_str = hostport.split(':', 1)
     else:
         address = hostport
-        port = '443'
+        port_str = '443'
+
+    # Очищаем порт от всего, кроме цифр
+    port_clean = re.sub(r'\D', '', port_str)
+    if port_clean == '':
+        port = 443
+    else:
+        port = int(port_clean)
 
     params = urllib.parse.parse_qs(query)
     for k, v in params.items():
@@ -120,7 +127,7 @@ def parse_vless_url(url):
         "settings": {
             "vnext": [{
                 "address": address,
-                "port": int(port),
+                "port": port,
                 "users": [{
                     "id": user_id,
                     "encryption": "none",
@@ -217,13 +224,11 @@ def main():
         {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"}
     ]
 
-    # Первый конфиг (все)
     config_all = create_config_template("🇫🇲 АБС Igareck [LTE]")
     config_all['outbounds'] = all_outbounds + direct_block
     config_all['routing']['balancers'][0]['selector'] = all_tags
     config_all['burstObservatory']['subjectSelector'] = all_tags
 
-    # Второй конфиг (без RU/BY)
     config_filtered = create_config_template("🇫🇲 АБС Igareck [LTE] NoRU/BY")
     config_filtered['outbounds'] = filtered_outbounds + direct_block
     config_filtered['routing']['balancers'][0]['selector'] = filtered_tags
