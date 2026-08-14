@@ -11,8 +11,7 @@ EXCLUDE_PATTERN = re.compile(r'(Россия|anycast|Беларусь|🇷🇺|�
 
 def fetch_url(url, timeout=15):
     """
-    Скачивание через curl — самый надежный способ в GitHub Actions,
-    так как он обходит стандартные блокировки Python urllib со стороны Cloudflare/SSL.
+    Скачивание через curl — самый надежный способ в GitHub Actions.
     """
     try:
         result = subprocess.run(
@@ -76,10 +75,10 @@ def create_config_template(remarks_text):
                     "strategy": {
                         "type": "leastLoad",
                         "settings": {
-                            "maxRTT": "7s",                         # Увеличено под высокий пинг
+                            "maxRTT": "7s",
                             "expected": 1,
-                            "baselines": ["500ms", "1500ms", "3000ms"], # Расширен диапазон задержек
-                            "tolerance": 0.1                       # Допуск 10% против флиппинга
+                            "baselines": ["500ms", "1500ms", "3000ms"],
+                            "tolerance": 0.1
                         }
                     },
                     "fallbackTag": "direct"
@@ -88,9 +87,9 @@ def create_config_template(remarks_text):
         },
         "burstObservatory": {
             "pingConfig": {
-                "timeout": "7s",                                    # Даем 7 сек на ответ
-                "interval": "1m",                                   # Проверка каждую 1 минуту
-                "sampling": 2,                                      # 2 запроса для проверки
+                "timeout": "7s",
+                "interval": "1m",
+                "sampling": 2,
                 "destination": "http://www.gstatic.com/generate_204"
             },
             "subjectSelector": []
@@ -173,8 +172,24 @@ def parse_vless_url(raw_url):
         return None, remarks
 
 
+def get_vless_links(urls_list):
+    """Вспомогательная функция для массового скачивания VLESS ссылок из списка URL"""
+    all_links = []
+    for url in urls_list:
+        print(f"📥 Скачиваем список: {url}")
+        content = fetch_url(url)
+        if content:
+            for line in content.splitlines():
+                line = line.strip()
+                if line.startswith('vless://'):
+                    all_links.append(line)
+    
+    # Возвращаем очищенный список без дубликатов
+    return list(dict.fromkeys(all_links))
+
+
 def main():
-    print("📥 Скачиваем платную подписку...")
+    print("📥 Загрузка платной подписки...")
     paid_sub_url = 'https://connliberty.com/connection/subs/22a12228-aa7d-4f34-a7cd-b617a8f61c20'
     paid_sub_raw = fetch_url(paid_sub_url)
     existing_configs = []
@@ -187,97 +202,127 @@ def main():
         except json.JSONDecodeError:
             print("⚠️ Ошибка парсинга JSON платной подписки", file=sys.stderr)
 
-    # ЗАЩИТА: Если подписка не скачалась, пытаемся восстановить прошлые платные конфиги из локального subscription.json
+    # ЗАЩИТА: Восстановление старых конфигов
     if not existing_configs:
         print("⚠️ Не удалось загрузить платную подписку по сети. Пробуем восстановить из прошлых данных...")
         try:
             with open('subscription.json', 'r', encoding='utf-8') as f:
                 old_file_data = json.load(f)
                 if isinstance(old_file_data, list):
-                    # Отфильтровываем сгенерированные ранее конфиги Игарька
+                    # Исключаем все ранее сгенерированные балансировщики (по эмодзи и старому названию)
+                    exclude_prefixes = ('🏳️list', '🏴', '🇫🇲 АБС')
                     existing_configs = [
                         c for c in old_file_data 
-                        if isinstance(c, dict) and not c.get('remarks', '').startswith('🇫🇲 АБС Igareck')
+                        if isinstance(c, dict) and not c.get('remarks', '').startswith(exclude_prefixes)
                     ]
                     print(f"🔄 Загружено {len(existing_configs)} платных конфигов из сохраненного subscription.json")
         except Exception as e:
             print(f"⚠️ Не удалось прочитать прошлый subscription.json: {e}")
 
-    print(f"Итого платных конфигов для включения в сборку: {len(existing_configs)}")
+    print(f"Итого платных конфигов: {len(existing_configs)}\n")
 
-    icareck_urls = [
+    # ==========================
+    # ОБРАБОТКА БЕЛЫХ СПИСКОВ
+    # ==========================
+    white_urls = [
         "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt",
         "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt"
     ]
+    
+    white_links = get_vless_links(white_urls)
+    print(f"Найдено {len(white_links)} уникальных ссылок (Белые списки)")
 
-    all_links = []
-    for url in icareck_urls:
-        print(f"📥 Скачиваем список: {url}")
-        content = fetch_url(url)
-        if content:
-            for line in content.splitlines():
-                line = line.strip()
-                if line.startswith('vless://'):
-                    all_links.append(line)
-
-    # Удаляем дубликаты ссылок
-    all_links = list(dict.fromkeys(all_links))
-
-    if not all_links:
-        print("❌ Не найдено ни одной VLESS ссылки Игарька", file=sys.stderr)
-        sys.exit(1)
-
-    print(f"Найдено {len(all_links)} уникальных ссылок Игарька")
-
-    parsed = []
-    for link in all_links:
+    white_parsed = []
+    for link in white_links:
         ob, rem = parse_vless_url(link)
         if ob is not None:
-            parsed.append((ob, rem))
+            white_parsed.append((ob, rem))
 
-    all_outbounds = []
-    all_tags = []
-    filtered_outbounds = []
-    filtered_tags = []
+    wl_outbounds_all = []
+    wl_tags_all = []
+    wl_outbounds_noru = []
+    wl_tags_noru = []
 
-    for idx, (ob, rem) in enumerate(parsed, start=1):
-        tag = f"proxy-ig-{idx}"
+    for idx, (ob, rem) in enumerate(white_parsed, start=1):
+        tag = f"proxy-wl-{idx}"
         
         ob_copy = json.loads(json.dumps(ob))
         ob_copy['tag'] = tag
-        all_outbounds.append(ob_copy)
-        all_tags.append(tag)
+        wl_outbounds_all.append(ob_copy)
+        wl_tags_all.append(tag)
 
         if not is_russia_or_belarus(rem):
-            filtered_outbounds.append(ob_copy)
-            filtered_tags.append(tag)
+            wl_outbounds_noru.append(ob_copy)
+            wl_tags_noru.append(tag)
 
+    # ==========================
+    # ОБРАБОТКА ЧЕРНОГО СПИСКА
+    # ==========================
+    print("\n")
+    black_urls = [
+        "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/BLACK_VLESS_RUS_mobile.txt"
+    ]
+    
+    black_links = get_vless_links(black_urls)
+    print(f"Найдено {len(black_links)} уникальных ссылок (Черные списки)")
+
+    black_parsed = []
+    for link in black_links:
+        ob, rem = parse_vless_url(link)
+        if ob is not None:
+            black_parsed.append((ob, rem))
+
+    bl_outbounds = []
+    bl_tags = []
+
+    for idx, (ob, rem) in enumerate(black_parsed, start=1):
+        tag = f"proxy-bl-{idx}"
+        
+        ob_copy = json.loads(json.dumps(ob))
+        ob_copy['tag'] = tag
+        bl_outbounds.append(ob_copy)
+        bl_tags.append(tag)
+
+    # ==========================
+    # СБОРКА ИТОГОВЫХ КОНФИГОВ
+    # ==========================
     direct_block = [
         {"protocol": "freedom", "settings": {"domainStrategy": "UseIP"}, "tag": "direct"},
         {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"}
     ]
 
-    # Сборка общего конфига Игарька
-    config_all = create_config_template("🇫🇲 АБС Igareck [LTE]")
-    config_all['outbounds'] = all_outbounds + direct_block
-    config_all['routing']['balancers'][0]['selector'] = all_tags
-    config_all['burstObservatory']['subjectSelector'] = all_tags
+    # 1. Белый список (Все)
+    config_wl_all = create_config_template("🏳️list [LTE]")
+    config_wl_all['outbounds'] = wl_outbounds_all + direct_block
+    config_wl_all['routing']['balancers'][0]['selector'] = wl_tags_all
+    config_wl_all['burstObservatory']['subjectSelector'] = wl_tags_all
 
-    # Сборка фильтрованного конфига Игарька (без RU/BY)
-    config_filtered = create_config_template("🇫🇲 АБС Igareck [LTE] NoRU/BY")
-    config_filtered['outbounds'] = filtered_outbounds + direct_block
-    config_filtered['routing']['balancers'][0]['selector'] = filtered_tags
-    config_filtered['burstObservatory']['subjectSelector'] = filtered_tags
+    # 2. Белый список (Без RU/BY)
+    config_wl_noru = create_config_template("🏳️list [LTE] NoRU/BY")
+    config_wl_noru['outbounds'] = wl_outbounds_noru + direct_block
+    config_wl_noru['routing']['balancers'][0]['selector'] = wl_tags_noru
+    config_wl_noru['burstObservatory']['subjectSelector'] = wl_tags_noru
 
-    # Объединяем 2 новых балансировщика + платные конфиги
-    final_configs = [config_all, config_filtered] + existing_configs
+    # 3. Черный список
+    config_bl = create_config_template("🏴 blacklist [LTE]")
+    # Проверка на случай, если черный список пуст
+    if bl_outbounds:
+        config_bl['outbounds'] = bl_outbounds + direct_block
+        config_bl['routing']['balancers'][0]['selector'] = bl_tags
+        config_bl['burstObservatory']['subjectSelector'] = bl_tags
+    else:
+        config_bl['outbounds'] = direct_block
+
+    # Объединяем все сгенерированные балансировщики и платные конфиги
+    final_configs = [config_wl_all, config_wl_noru, config_bl] + existing_configs
 
     with open('subscription.json', 'w', encoding='utf-8') as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Успешно обновлено!")
-    print(f"   • Серверов в балансировщике (Все): {len(all_tags)}")
-    print(f"   • Серверов в балансировщике (NoRU/BY): {len(filtered_tags)}")
+    print("\n✅ Успешно обновлено!")
+    print(f"   • Серверов в белом списке (Все): {len(wl_tags_all)}")
+    print(f"   • Серверов в белом списке (NoRU/BY): {len(wl_tags_noru)}")
+    print(f"   • Серверов в черном списке: {len(bl_tags)}")
     print(f"   • Всего записей в файле подписки: {len(final_configs)}")
 
 
