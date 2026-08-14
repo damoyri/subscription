@@ -1,11 +1,27 @@
 #!/usr/bin/env python3
-import re
 import json
-import urllib.parse
-import subprocess
+import re
 import sys
+import urllib.parse
+import urllib.request
 
 VALID_FINGERPRINTS = ['chrome', 'firefox', 'edge', 'safari', 'ios', 'android', 'qq', 'random']
+EXCLUDE_PATTERN = re.compile(r'(Россия|anycast|Беларусь|🇷🇺|🇧🇾|Russia|Belarus)', re.IGNORECASE)
+
+
+def fetch_url(url, timeout=12):
+    """Безопасно скачивает содержимое по URL с помощью urllib."""
+    req = urllib.request.Request(
+        url,
+        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            return response.read().decode('utf-8', errors='ignore')
+    except Exception as e:
+        print(f"⚠️ Ошибка загрузки {url}: {e}", file=sys.stderr)
+        return None
+
 
 def clean_fingerprint(fp):
     if not fp:
@@ -13,12 +29,12 @@ def clean_fingerprint(fp):
     cleaned = re.sub(r'[#|*].*', '', fp).strip().lower()
     return cleaned if cleaned in VALID_FINGERPRINTS else 'chrome'
 
-EXCLUDE_PATTERN = re.compile(r'(Россия|anycast|Беларусь|🇷🇺|🇧🇾|Russia|Belarus)', re.IGNORECASE)
 
 def is_russia_or_belarus(remarks):
     if not remarks:
         return False
     return bool(EXCLUDE_PATTERN.search(remarks))
+
 
 def create_config_template(remarks_text):
     return {
@@ -58,10 +74,10 @@ def create_config_template(remarks_text):
                     "strategy": {
                         "type": "leastLoad",
                         "settings": {
-                            "maxRTT": "5s",          # вернул 5s
+                            "maxRTT": "7s",                         # Увеличено под высокий пинг
                             "expected": 1,
-                            "baselines": ["500ms", "1000ms"],  # вернул как в примере
-                            "tolerance": 0
+                            "baselines": ["500ms", "1500ms", "3000ms"], # Расширен диапазон задержек
+                            "tolerance": 0.1                       # Допуск 10% для защиты от флиппинга
                         }
                     },
                     "fallbackTag": "direct"
@@ -70,9 +86,9 @@ def create_config_template(remarks_text):
         },
         "burstObservatory": {
             "pingConfig": {
-                "timeout": "5s",          # 5 секунд на проверку (не 3, не 25)
-                "interval": "5m",         # каждые 5 минут (как в примере)
-                "sampling": 1,
+                "timeout": "7s",                                    # Даем 7 сек на ответ
+                "interval": "1m",                                   # Проверка каждую 1 минуту
+                "sampling": 2,                                      # 2 запроса для исключения случайных потерь
                 "destination": "http://www.gstatic.com/generate_204"
             },
             "subjectSelector": []
@@ -81,122 +97,119 @@ def create_config_template(remarks_text):
         "remarks": remarks_text
     }
 
-def parse_vless_url(url):
+
+def parse_vless_url(raw_url):
+    """Надежный парсинг VLESS URL с помощью urllib.parse."""
     remarks = ''
-    if '#' in url:
-        url, remarks = url.split('#', 1)
-        remarks = remarks.strip()
+    url_str = raw_url.strip()
 
-    if not url.startswith('vless://'):
+    if '#' in url_str:
+        url_str, remarks = url_str.split('#', 1)
+        remarks = urllib.parse.unquote(remarks.strip())
+
+    if not url_str.startswith('vless://'):
         return None, remarks
 
-    parts = url[8:].split('@')
-    if len(parts) != 2:
-        return None, remarks
+    try:
+        parsed = urllib.parse.urlparse(url_str)
+        user_id = parsed.username
+        address = parsed.hostname
+        port = parsed.port or 443
 
-    userinfo = parts[0]
-    hostport = parts[1].split('?')[0]
-    query = parts[1].split('?')[1] if '?' in parts[1] else ''
+        if not user_id or not address:
+            return None, remarks
 
-    user_parts = userinfo.split(':')
-    user_id = user_parts[0]
+        # Разбор Query-параметров
+        query_params = urllib.parse.parse_qs(parsed.query)
+        params = {k: v[0] for k, v in query_params.items() if v}
 
-    if ':' in hostport:
-        address, port_str = hostport.split(':', 1)
-    else:
-        address = hostport
-        port_str = '443'
+        fp_raw = params.get('fp') or params.get('fingerprint', 'chrome')
+        fingerprint = clean_fingerprint(fp_raw)
 
-    # Очищаем порт от всего, кроме цифр
-    port_clean = re.sub(r'\D', '', port_str)
-    if port_clean == '':
-        port = 443
-    else:
-        port = int(port_clean)
+        is_reality = ('pbk' in params) or ('publicKey' in params) or (params.get('security') == 'reality')
 
-    params = urllib.parse.parse_qs(query)
-    for k, v in params.items():
-        params[k] = v[0] if v else ''
-
-    fp_raw = params.get('fp') or params.get('fingerprint', 'firefox')
-    fingerprint = clean_fingerprint(fp_raw)
-
-    outbound = {
-        "tag": None,
-        "protocol": "vless",
-        "settings": {
-            "vnext": [{
-                "address": address,
-                "port": port,
-                "users": [{
-                    "id": user_id,
-                    "encryption": "none",
-                    "flow": params.get('flow', ''),
-                    "level": 8
+        outbound = {
+            "tag": None,
+            "protocol": "vless",
+            "settings": {
+                "vnext": [{
+                    "address": address,
+                    "port": port,
+                    "users": [{
+                        "id": user_id,
+                        "encryption": "none",
+                        "flow": params.get('flow', ''),
+                        "level": 8
+                    }]
                 }]
-            }]
-        },
-        "streamSettings": {
-            "network": "tcp",
-            "security": "reality" if ('pbk' in params or 'publicKey' in params) else "tls",
-            "tcpSettings": {"header": {"type": "none"}}
-        }
-    }
-
-    if outbound["streamSettings"]["security"] == "reality":
-        outbound["streamSettings"]["realitySettings"] = {
-            "allowInsecure": False,
-            "fingerprint": fingerprint,
-            "publicKey": params.get('pbk', '') or params.get('publicKey', ''),
-            "serverName": params.get('sni', address),
-            "shortId": params.get('sid', ''),
-            "show": False
-        }
-    else:
-        outbound["streamSettings"]["tlsSettings"] = {
-            "allowInsecure": False,
-            "serverName": params.get('sni', address),
-            "fingerprint": fingerprint
+            },
+            "streamSettings": {
+                "network": params.get('type', 'tcp'),
+                "security": "reality" if is_reality else "tls",
+                "tcpSettings": {"header": {"type": "none"}}
+            }
         }
 
-    return outbound, remarks
+        if is_reality:
+            outbound["streamSettings"]["realitySettings"] = {
+                "allowInsecure": False,
+                "fingerprint": fingerprint,
+                "publicKey": params.get('pbk', '') or params.get('publicKey', ''),
+                "serverName": params.get('sni', address),
+                "shortId": params.get('sid', ''),
+                "show": False
+            }
+        else:
+            outbound["streamSettings"]["tlsSettings"] = {
+                "allowInsecure": False,
+                "serverName": params.get('sni', address),
+                "fingerprint": fingerprint
+            }
+
+        return outbound, remarks
+
+    except Exception as e:
+        return None, remarks
+
 
 def main():
-    print("Скачиваем платную подписку...")
-    try:
-        result = subprocess.run(
-            ['curl', '-sL', 'https://connliberty.com/connection/subs/22a12228-aa7d-4f34-a7cd-b617a8f61c20'],
-            capture_output=True, text=True, check=True
-        )
-        existing_configs = json.loads(result.stdout.strip())
-        if not isinstance(existing_configs, list):
-            existing_configs = []
-    except:
-        existing_configs = []
+    print("📥 Скачиваем платную подписку...")
+    paid_sub_raw = fetch_url('https://connliberty.com/connection/subs/22a12228-aa7d-4f34-a7cd-b617a8f61c20')
+    existing_configs = []
+    
+    if paid_sub_raw:
+        try:
+            parsed_json = json.loads(paid_sub_raw)
+            if isinstance(parsed_json, list):
+                existing_configs = parsed_json
+        except json.JSONDecodeError:
+            print("⚠️ Ошибка парсинга JSON платной подписки", file=sys.stderr)
 
     print(f"Загружено {len(existing_configs)} конфигов из платной подписки")
 
-    igareck_urls = [
+    icareck_urls = [
         "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt",
         "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt"
     ]
 
     all_links = []
-    for url in igareck_urls:
-        try:
-            result = subprocess.run(['curl', '-sL', url], capture_output=True, text=True, check=True)
-            for line in result.stdout.splitlines():
+    for url in icareck_urls:
+        print(f"📥 Скачиваем список: {url}")
+        content = fetch_url(url)
+        if content:
+            for line in content.splitlines():
                 line = line.strip()
                 if line.startswith('vless://'):
                     all_links.append(line)
-        except:
-            pass
+
+    # Удаляем дубликаты ссылок с сохранением порядка
+    all_links = list(dict.fromkeys(all_links))
 
     if not all_links:
-        print("Нет ссылок Игарька", file=sys.stderr)
+        print("❌ Не найдено ни одной VLESS ссылки", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Найдено {len(all_links)} ссылок Игарька")
+    print(f"Найдено {len(all_links)} уникальных ссылок")
 
     parsed = []
     for link in all_links:
@@ -209,14 +222,16 @@ def main():
     filtered_outbounds = []
     filtered_tags = []
 
-    for idx, (ob, rem) in enumerate(parsed):
-        tag = f"proxy-ig-{idx+1}"
-        ob['tag'] = tag
-        all_outbounds.append(ob)
+    for idx, (ob, rem) in enumerate(parsed, start=1):
+        tag = f"proxy-ig-{idx}"
+        
+        ob_copy = json.loads(json.dumps(ob))
+        ob_copy['tag'] = tag
+        all_outbounds.append(ob_copy)
         all_tags.append(tag)
 
         if not is_russia_or_belarus(rem):
-            filtered_outbounds.append(ob.copy())
+            filtered_outbounds.append(ob_copy)
             filtered_tags.append(tag)
 
     direct_block = [
@@ -224,11 +239,13 @@ def main():
         {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"}
     ]
 
+    # Сборка общего конфига
     config_all = create_config_template("🇫🇲 АБС Igareck [LTE]")
     config_all['outbounds'] = all_outbounds + direct_block
     config_all['routing']['balancers'][0]['selector'] = all_tags
     config_all['burstObservatory']['subjectSelector'] = all_tags
 
+    # Сборка фильтрованного конфига (без RU/BY)
     config_filtered = create_config_template("🇫🇲 АБС Igareck [LTE] NoRU/BY")
     config_filtered['outbounds'] = filtered_outbounds + direct_block
     config_filtered['routing']['balancers'][0]['selector'] = filtered_tags
@@ -239,8 +256,11 @@ def main():
     with open('subscription.json', 'w', encoding='utf-8') as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Добавлено 2 конфига: {len(all_tags)} и {len(filtered_tags)} серверов")
-    print(f"Всего конфигов в файле: {len(final_configs)}")
+    print(f"✅ Успешно сгенерировано!")
+    print(f"   • Все серверы: {len(all_tags)}")
+    print(f"   • NoRU/BY серверы: {len(filtered_tags)}")
+    print(f"   • Итоговый размер файла: {len(final_configs)} конфигов")
+
 
 if __name__ == '__main__':
     main()
