@@ -18,27 +18,46 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y curl jq
 
+      # ----- Установка sing-box (обязательно!) -----
+      - name: Install sing-box
+        run: |
+          curl -sL -o sing-box.tar.gz \
+            https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-linux-amd64.tar.gz
+          tar -xzf sing-box.tar.gz --strip-components=1 -C /tmp \
+            $(tar -tzf sing-box.tar.gz | grep '/sing-box$')
+          sudo mv /tmp/sing-box /usr/local/bin/sing-box
+          sudo chmod +x /usr/local/bin/sing-box
+          sing-box version
+
       - name: Pull latest changes (avoid conflicts)
         run: git pull --rebase origin main || echo "No upstream changes"
 
+      # ----- Передаём секрет в окружение -----
       - name: Run config builder
+        env:
+          PAID_SUB_URL: ${{ secrets.PAID_SUB_URL }}
         run: python3 build_config.py
 
       - name: Commit and push to GitHub
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add subscription.json subscription.txt sub2.txt sub2.json
+          # --ignore-errors — не падаем, если файл отсутствует
+          git add --ignore-errors subscription.json subscription.txt sub2.txt sub2.json
           git commit -m "Update subscription files" || echo "No changes to commit"
           git pull --rebase origin main || echo "Rebase done"
           git push origin main
 
+      # ----- Безопасный пуш в Bitbucket -----
       - name: Push to Bitbucket (SSH)
+        if: ${{ secrets.BITBUCKET_SSH_PRIVATE_KEY != '' }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.BITBUCKET_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
-          git remote add bitbucket git@bitbucket.org:damoyri/subscription.git
-          git push --force --all bitbucket
-          git push --force --tags bitbucket
+          # Добавляем remote только если его нет
+          git remote get-url bitbucket || git remote add bitbucket git@bitbucket.org:damoyri/subscription.git
+          # Вместо --force используем обычный push (или оставьте --force, если уверены)
+          git push --all bitbucket
+          git push --tags bitbucket
