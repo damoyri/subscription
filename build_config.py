@@ -636,15 +636,15 @@ async def check_via_singbox(outbound: Dict[str, Any], test_port: int,
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = os.path.join(tmpdir, "config.json")
-        # Корректный формат для sing-box 1.11+
+        # ✅ ПРАВИЛЬНЫЙ ФОРМАТ ДЛЯ SING-BOX 1.13+
         config = {
             "log": {"level": "warn"},
             "inbounds": [
                 {
-                    "type": "socks",
+                    "type": "socks",           # было "protocol"
                     "tag": "socks-in",
                     "listen": "127.0.0.1",
-                    "listen_port": test_port,
+                    "listen_port": test_port,  # было "port"
                     "sniff": True,
                     "sniff_override_destination": False,
                 }
@@ -679,24 +679,20 @@ async def check_via_singbox(outbound: Dict[str, Any], test_port: int,
                     log_err(f"⚠️ sing-box не запустился на порту {test_port}: {stderr.decode(errors='ignore')[:300]}")
                 return None
 
-            # ================================================================
-            # ИСПРАВЛЕННЫЙ ВЫЗОВ curl – без --retry, с чёткими таймаутами
-            # ================================================================
+            # ✅ curl без --retry, с чёткими таймаутами
             curl_proc = await asyncio.create_subprocess_exec(
                 "curl", "-s", "-o", "/dev/null", "-w", "%{time_total}",
                 "--socks5", f"127.0.0.1:{test_port}",
-                "--connect-timeout", "5",      # максимум 5 секунд на соединение
-                "--max-time", "10",            # общий лимит 10 секунд (не ждём дольше)
+                "--connect-timeout", "5",
+                "--max-time", "10",
                 "http://www.gstatic.com/generate_204",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
             try:
-                # Даём curl чуть больше времени, чем его внутренний --max-time,
-                # чтобы не убивать процесс до его естественного завершения.
                 stdout, stderr = await asyncio.wait_for(
                     curl_proc.communicate(),
-                    timeout=timeout + 2   # если timeout=15, то ждём 17 сек
+                    timeout=timeout + 2
                 )
             except asyncio.TimeoutError:
                 curl_proc.kill()
