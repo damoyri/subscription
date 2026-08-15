@@ -27,7 +27,7 @@ SOURCES = [
     "https://github.com/nikita29a/FreeProxyList/raw/refs/heads/main/mirror/1.txt",
 ]
 
-TOP_K = 30                 # сколько лучших конфигов оставить
+TOP_K = 67                 # сколько лучших конфигов оставить
 TCP_TIMEOUT = 3.0          # таймаут TCP-пинга (сек)
 MAX_CONCURRENT = 20        # параллельных проверок
 
