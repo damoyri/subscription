@@ -35,10 +35,7 @@ TCP_TIMEOUT = 2.5          # таймаут TCP-пинга (сек)
 MAX_CONCURRENT = 50        # параллельных проверок
 
 # Ключевые слова для исключения (регистронезависимо)
-EXCLUDED_KEYWORDS = [
-    "россия", "беларусь", "russia", "belarus",
-    "🇷🇺", "🇧🇾", "ru"          # anycast убрали – не исключаем
-]
+EXCLUDED_KEYWORDS = []
 
 # ======================== ПАРСЕРЫ ПРОТОКОЛОВ ========================
 def parse_proxy_url(url: str) -> Optional[Tuple[str, int]]:
