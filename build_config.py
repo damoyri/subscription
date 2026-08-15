@@ -763,11 +763,20 @@ async def load_paid_subscription() -> List[Dict[str, Any]]:
             with open("subscription.json", "r", encoding="utf-8") as f:
                 old = json.load(f)
             if isinstance(old, list):
-                exclude_prefixes = ("🏳️list", "🏴list", "✅", "⛔", "📦")
-                configs = [c for c in old if isinstance(c, dict) and not c.get("remarks", "").startswith(exclude_prefixes)]
-                log(f"🔄 Восстановлено {len(configs)} платных конфигов")
+                configs = old
+                log(f"🔄 Восстановлено {len(configs)} конфигов из локального файла")
         except Exception as e:
             log_err(f"⚠️ Не удалось прочитать сохранённый subscription.json: {e}")
+
+    # --- Фильтруем балансировщики (удаляем всё с маркерами) ---
+    exclude_markers = ("🏳️", "🏴", "📦", "✅", "⛔")
+    filtered = []
+    for c in configs:
+        remarks = c.get("remarks", "")
+        if not any(marker in remarks for marker in exclude_markers):
+            filtered.append(c)
+    configs = filtered
+    log(f"📊 После фильтрации балансировщиков осталось {len(configs)} платных конфигов")
 
     # "Обход"/"бс" — приоритетные конфиги в начало списка
     priority_kw = ("обход", "бс")
