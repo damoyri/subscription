@@ -35,7 +35,7 @@ import time
 import urllib.parse
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # ============================================================================
 # Конфигурация (никаких секретов в коде!)
@@ -657,10 +657,12 @@ async def check_and_create_balancer(
     remarks_ok_template: str = "✅ {name} (рабочих: {count})",
     remarks_fail: str = "⛔ Временно не работает",
     reserve_candidates: Optional[List[Candidate]] = None,
+    reserve_filter: Optional[Callable[[Candidate], bool]] = None,
 ) -> Tuple[Dict[str, Any], List[Candidate]]:
     """
     Создаёт балансировщик из parsed_candidates, используя TCP-пинг.
-    Если после отбора лучших по TCP меньше max_servers, добирает из reserve_candidates.
+    Если после отбора лучших по TCP меньше max_servers, добирает из reserve_candidates
+    с применением reserve_filter (если задан).
     Возвращает (config, all_alive_candidates) — все живые кандидаты (для использования как резерв).
     """
     log(f"\n🔍 Проверка источника: {source_name} (всего {len(parsed_candidates)} конфигов)")
@@ -684,16 +686,25 @@ async def check_and_create_balancer(
     shortlist = alive[:MAX_FOR_SINGBOX]
     log(f"   🔍 Для балансировщика отобрано {len(shortlist)} лучших по TCP")
 
-    # Берём максимум из shortlist и резерва
+    # Берём максимум из shortlist
     best = shortlist[:max_servers]
+    used_addrs = {(c.address, c.port) for c in best}
+
+    # Если не хватает и есть резерв
     if len(best) < max_servers and reserve_candidates:
         needed = max_servers - len(best)
-        # Исключаем уже использованные (по адресу+порт)
-        used_addrs = {(c.address, c.port) for c in best}
-        extra_from_reserve = [c for c in reserve_candidates if (c.address, c.port) not in used_addrs]
-        take = extra_from_reserve[:needed]
-        best.extend(take)
-        log(f"   ➕ Добавлено {len(take)} из резерва (extra)")
+        # Сортируем резерв по RTT (на случай, если не отсортирован)
+        sorted_reserve = sorted(reserve_candidates, key=lambda c: c.rtt)
+        for c in sorted_reserve:
+            if len(best) >= max_servers:
+                break
+            if (c.address, c.port) in used_addrs:
+                continue
+            if reserve_filter is not None and not reserve_filter(c):
+                continue
+            best.append(c)
+            used_addrs.add((c.address, c.port))
+        log(f"   ➕ Добавлено {len(best) - len(shortlist[:max_servers])} из резерва")
 
     log(f"   🏆 Итоговое количество: {len(best)}")
 
@@ -794,40 +805,36 @@ async def main_async() -> None:
     extra_parsed = parse_all(extra_links)
     white_without_ru = [p for p in white_parsed if not is_excluded_region(p.remarks)]
 
-    # Сначала обрабатываем extra, чтобы получить список живых кандидатов для резерва
+    # Сначала обрабатываем EXTRA, чтобы получить список живых кандидатов для резерва
     config_extra, alive_extra = await check_and_create_balancer(
         extra_parsed, "EXTRA", MAX_SERVERS_PER_BALANCER,
-        remarks_ok_template="📦 EXTRA ✅ {count}",
-        remarks_fail="📦 EXTRA ⛔ Временно не работает",
-        reserve_candidates=None
+        remarks_ok_template="📦 EXTRA (26.txt) ✅ {count}",
+        remarks_fail="📦 EXTRA (26.txt) ⛔ Временно не работает",
+        reserve_candidates=None,
+        reserve_filter=None
     )
 
-    # Резерв для других списков: все кандидаты extra, кроме тех, кто попал в top MAX_SERVERS_PER_BALANCER
-    reserve = alive_extra[MAX_SERVERS_PER_BALANCER:] if len(alive_extra) > MAX_SERVERS_PER_BALANCER else []
-
-    # Обрабатываем остальные источники с резервом
-    config_white_all, _ = await check_and_create_balancer(
-        white_parsed, "WL", MAX_SERVERS_PER_BALANCER,
-        remarks_ok_template="🏳️ WL ✅ {count}",
-        remarks_fail="🏳️ WL ⛔ Временно не работает",
-        reserve_candidates=reserve
-    )
-
+    # Обрабатываем WL-noRU с резервом из ВСЕХ живых EXTRA (с фильтром no RU/BY)
     config_white_noru, _ = await check_and_create_balancer(
         white_without_ru, "WL-noRU", MAX_SERVERS_PER_BALANCER,
-        remarks_ok_template="🏳️ WL-noRU ✅ {count}",
-        remarks_fail="🏳️ WL-noRU ⛔ Временно не работает",
-        reserve_candidates=reserve
+        remarks_ok_template="🏳️ WL-noRU (белый без RU/BY) ✅ {count}",
+        remarks_fail="🏳️ WL-noRU (белый без RU/BY) ⛔ Временно не работает",
+        reserve_candidates=alive_extra,
+        reserve_filter=lambda c: not is_excluded_region(c.remarks)
     )
 
+    # Обрабатываем чёрный список (без резерва)
     config_black, _ = await check_and_create_balancer(
         black_parsed, "BL", MAX_SERVERS_PER_BALANCER,
-        remarks_ok_template="🏴 BL ✅ {count}",
-        remarks_fail="🏴 BL ⛔ Временно не работает",
-        reserve_candidates=reserve
+        remarks_ok_template="🏴 BL (чёрный) ✅ {count}",
+        remarks_fail="🏴 BL (чёрный) ⛔ Временно не работает",
+        reserve_candidates=None,
+        reserve_filter=None
     )
 
-    final_configs = [config_white_all, config_white_noru, config_black, config_extra] + existing_configs
+    # Формируем финальный список конфигов (WL-noRU, BL, EXTRA + платные)
+    final_configs = [config_white_noru, config_black, config_extra] + existing_configs
+
     with open("subscription.json", "w", encoding="utf-8") as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
     with open("subscription.txt", "w", encoding="utf-8") as f:
@@ -850,10 +857,9 @@ async def main_async() -> None:
         return len(cfg.get("routing", {}).get("balancers", [{}])[0].get("selector", []))
 
     log("\n✅ Успешно обновлено!")
-    log(f"   • WL: {selector_len(config_white_all)} серверов")
-    log(f"   • WL-noRU: {selector_len(config_white_noru)} серверов")
-    log(f"   • BL: {selector_len(config_black)} серверов")
-    log(f"   • EXTRA: {selector_len(config_extra)} серверов")
+    log(f"   • WL-noRU (белый без RU/BY): {selector_len(config_white_noru)} серверов")
+    log(f"   • BL (чёрный): {selector_len(config_black)} серверов")
+    log(f"   • EXTRA (26.txt): {selector_len(config_extra)} серверов")
     log(f"   • Всего записей в subscription.json: {len(final_configs)}")
     log(f"   • Ссылок для Karing: {len(all_links)}")
 
