@@ -1,0 +1,34 @@
+name: Update best VPN links (no RU/BY)
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'   # каждые 6 часов
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
+
+      - name: Pull latest changes
+        run: git pull --rebase origin main || echo "No upstream changes"
+
+      - name: Run updater
+        run: python3 update_subscription.py
+
+      - name: Commit and push results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add best_ping.txt
+          git commit -m "Обновлены лучшие ссылки по пингу (без РФ/РБ)" || echo "Нет изменений"
+          git push origin main
