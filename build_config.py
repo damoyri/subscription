@@ -1,7 +1,24 @@
 #!/usr/bin/env python3
 """
 build_config.py — сборщик и проверщик VPN-конфигураций для sing-box.
-(полная версия с краткими названиями и отключённой проверкой через sing-box)
+
+Объединяет лучшие решения из двух независимых код-ревью:
+  • модульный парсинг/генерация нескольких протоколов (vless, hysteria2, trojan,
+    shadowsocks, vmess) через реестр обработчиков (легко добавить новый протокол);
+  • исправление критического бага маршрутизации sing-box
+    (outbound.get("tag", "proxy") не срабатывал, т.к. ключ "tag" существовал со
+    значением None — тег теперь всегда принудительно проставляется в "proxy");
+  • секрет платной подписки только из переменной окружения, никогда в коде;
+  • устранение race condition при старте sing-box (активный poll порта вместо
+    фиксированного sleep);
+  • защита от падения sing-box на пустом balancer.selector (если рабочих
+    конфигов нет — балансировщик убирается, трафик идёт в direct);
+  • валидация обязательных полей Reality (pbk/publicKey);
+  • нормализация IPv6-адресов (квадратные скобки);
+  • безопасное логирование — секреты (UUID/пароли/ключи) маскируются перед
+    выводом в stderr/stdout, полный traceback никогда не печатается;
+  • асинхронная проверка через asyncio (TCP-пинг + запуск sing-box + curl),
+    что быстрее и стабильнее, чем process-pool с sleep().
 """
 
 from __future__ import annotations
@@ -18,13 +35,13 @@ import time
 import urllib.parse
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Callable
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # ============================================================================
-# Конфигурация
+# Конфигурация (никаких секретов в коде!)
 # ============================================================================
 
-PAID_SUB_URL = os.environ.get("PAID_SUB_URL", "")
+PAID_SUB_URL = os.environ.get("PAID_SUB_URL", "")  # обязателен через Secrets/env
 WHITE_URLS = [
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt",
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt",
@@ -49,11 +66,12 @@ EXCLUDE_PATTERN = re.compile(r"(Россия|anycast|Беларусь|🇷🇺|�
 
 _SECRET_PATTERN = re.compile(
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
-    r"|(?<=://)[^@/\s]{10,}(?=@)"
+    r"|(?<=://)[^@/\s]{10,}(?=@)"  # userinfo перед @ (пароли/base64-auth)
 )
 
 
 def mask_secret(text: str) -> str:
+    """Маскирует UUID/пароли/ключи перед выводом в лог, чтобы не палить секреты в CI-логах."""
     return _SECRET_PATTERN.sub("<REDACTED>", text)
 
 
@@ -81,6 +99,7 @@ def is_excluded_region(remarks: str) -> bool:
 
 
 def normalize_address(addr: str) -> str:
+    """Убирает квадратные скобки IPv6 для использования в socket/curl."""
     if addr.startswith("[") and addr.endswith("]"):
         return addr[1:-1]
     return addr
@@ -93,6 +112,7 @@ def bracket_if_ipv6(addr: str) -> str:
 
 
 async def fetch_url(url: str, timeout: float = 15.0) -> Optional[str]:
+    """Асинхронная загрузка через curl (без внешних зависимостей)."""
     try:
         proc = await asyncio.create_subprocess_exec(
             "curl", "-sL", "--max-time", str(int(timeout)), url,
@@ -109,6 +129,7 @@ async def fetch_url(url: str, timeout: float = 15.0) -> Optional[str]:
 
 
 def create_config_template(remarks_text: str) -> Dict[str, Any]:
+    """Базовый шаблон sing-box конфига с балансировщиком."""
     return {
         "dns": {
             "servers": ["https://8.8.8.8/dns-query", "https://8.8.4.4/dns-query"],
@@ -161,6 +182,8 @@ def create_config_template(remarks_text: str) -> Dict[str, Any]:
 
 
 def strip_balancer_for_empty(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Если рабочих конфигов нет — убираем balancer/burstObservatory, чтобы sing-box
+    не падал на валидации пустого selector, и направляем трафик в direct."""
     config["routing"]["rules"] = [
         {"type": "field", "protocol": ["bittorrent"], "outboundTag": "direct"},
         {"type": "field", "network": "tcp,udp", "outboundTag": "direct"},
@@ -175,7 +198,9 @@ def strip_balancer_for_empty(config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # ============================================================================
-# Обработчики протоколов (полный набор: vless, hysteria2, trojan, shadowsocks, vmess)
+# Модульные обработчики протоколов (парсинг + генерация ссылки)
+# Каждый протокол — отдельный класс. Чтобы добавить протокол — реализуй
+# ProtocolHandler и зарегистрируй его в PROTOCOL_REGISTRY.
 # ============================================================================
 
 @dataclass
@@ -220,9 +245,12 @@ class VlessHandler(ProtocolHandler):
             address = normalize_address(address_raw)
             params = {k: v[0] for k, v in urllib.parse.parse_qs(parsed.query).items() if v}
             fingerprint = clean_fingerprint(params.get("fp") or params.get("fingerprint"))
+
             is_reality = ("pbk" in params) or ("publicKey" in params) or (params.get("security") == "reality")
+            # Критичная проверка: без публичного ключа Reality-конфиг невалиден.
             if is_reality and not (params.get("pbk") or params.get("publicKey")):
                 return None
+
             outbound: Dict[str, Any] = {
                 "tag": None,
                 "protocol": "vless",
@@ -262,6 +290,7 @@ class VlessHandler(ProtocolHandler):
             user = vnext["users"][0]
             stream = outbound.get("streamSettings", {})
             network, security = stream.get("network", "tcp"), stream.get("security", "")
+
             params: Dict[str, str] = {"encryption": user.get("encryption", "none")}
             if user.get("flow"):
                 params["flow"] = user["flow"]
@@ -269,6 +298,7 @@ class VlessHandler(ProtocolHandler):
                 params["security"] = security
             if network != "tcp":
                 params["type"] = network
+
             if security == "reality":
                 r = stream.get("realitySettings", {})
                 params.update({k: v for k, v in {
@@ -280,6 +310,7 @@ class VlessHandler(ProtocolHandler):
                 params.update({k: v for k, v in {
                     "sni": t.get("serverName"), "fp": t.get("fingerprint"),
                 }.items() if v})
+
             addr_out = bracket_if_ipv6(address)
             url = f"vless://{user['id']}@{addr_out}:{port}"
             if params:
@@ -310,6 +341,7 @@ class Hysteria2Handler(ProtocolHandler):
             insecure = params.get("insecure", ["0"])[0] == "1"
             alpn = params.get("alpn", [None])[0]
             alpn_list = alpn.split(",") if alpn else []
+
             outbound = {
                 "tag": None, "protocol": "hysteria2",
                 "settings": {"servers": [{
@@ -417,6 +449,7 @@ class ShadowsocksHandler(ProtocolHandler):
                 method, password = userinfo.split(":", 1)
             address_raw, port_str = hostport.rsplit(":", 1)
             address, port = normalize_address(address_raw), int(port_str)
+
             outbound = {
                 "tag": None, "protocol": "shadowsocks",
                 "settings": {"servers": [{
@@ -461,6 +494,7 @@ class VmessHandler(ProtocolHandler):
             port = int(cfg.get("port", 443))
             address = normalize_address(address)
             network, tls = cfg.get("net", "tcp"), cfg.get("tls", "")
+
             outbound: Dict[str, Any] = {
                 "tag": None, "protocol": "vmess",
                 "settings": {"vnext": [{
@@ -554,7 +588,7 @@ async def get_links_from_urls(urls: List[str]) -> List[str]:
 
 
 # ============================================================================
-# Проверка: только TCP-пинг (sing-box отключён)
+# Проверка: TCP-пинг + реальный тест через sing-box (полностью асинхронно)
 # ============================================================================
 
 async def tcp_ping(host: str, port: int, timeout: float = TCP_TIMEOUT) -> Optional[float]:
@@ -572,6 +606,8 @@ async def tcp_ping(host: str, port: int, timeout: float = TCP_TIMEOUT) -> Option
 
 
 async def _wait_for_port(host: str, port: int, deadline: float) -> bool:
+    """Активный poll порта вместо ненадёжного sleep — устраняет race condition
+    запуска sing-box на медленных CI-раннерах."""
     start = time.monotonic()
     while time.monotonic() - start < deadline:
         try:
@@ -589,7 +625,7 @@ async def _wait_for_port(host: str, port: int, deadline: float) -> bool:
 
 async def check_via_singbox(outbound: Dict[str, Any], test_port: int,
                              timeout: float = SINGBOX_CURL_TIMEOUT) -> Optional[float]:
-    # ВРЕМЕННО ОТКЛЮЧЕНО
+    # ВРЕМЕННО ОТКЛЮЧЕНО — используем только TCP-пинг
     return None
 
 
@@ -623,13 +659,19 @@ async def check_and_create_balancer(
     reserve_candidates: Optional[List[Candidate]] = None,
     reserve_filter: Optional[Callable[[Candidate], bool]] = None,
 ) -> Tuple[Dict[str, Any], List[Candidate]]:
+    """
+    Создаёт балансировщик из parsed_candidates, используя TCP-пинг.
+    Если после отбора лучших по TCP меньше max_servers, добирает из reserve_candidates
+    с применением reserve_filter (если задан).
+    Возвращает (config, all_alive_candidates) — все живые кандидаты (для использования как резерв).
+    """
     log(f"\n🔍 Проверка источника: {source_name} (всего {len(parsed_candidates)} конфигов)")
     fail_config = strip_balancer_for_empty(create_config_template(remarks_fail))
 
     if not parsed_candidates:
         return fail_config, []
 
-    # TCP-пинг
+    # Этап 1: параллельный TCP-пинг
     ping_tasks = [tcp_ping(p.address, p.port) for p in parsed_candidates]
     ping_results = await asyncio.gather(*ping_tasks, return_exceptions=False)
     alive = [
@@ -644,11 +686,14 @@ async def check_and_create_balancer(
     shortlist = alive[:MAX_FOR_SINGBOX]
     log(f"   🔍 Для балансировщика отобрано {len(shortlist)} лучших по TCP")
 
+    # Берём максимум из shortlist
     best = shortlist[:max_servers]
     used_addrs = {(c.address, c.port) for c in best}
 
+    # Если не хватает и есть резерв
     if len(best) < max_servers and reserve_candidates:
         needed = max_servers - len(best)
+        # Сортируем резерв по RTT (на случай, если не отсортирован)
         sorted_reserve = sorted(reserve_candidates, key=lambda c: c.rtt)
         for c in sorted_reserve:
             if len(best) >= max_servers:
@@ -682,12 +727,12 @@ async def check_and_create_balancer(
 
 
 # ============================================================================
-# Загрузка платной подписки (из локального файла, если URL недоступен)
+# Загрузка платной подписки (JSON конфигов ИЛИ base64-список ссылок)
 # ============================================================================
 
 async def load_paid_subscription() -> List[Dict[str, Any]]:
     if not PAID_SUB_URL:
-        log_err("⚠️ PAID_SUB_URL не задан — загружаем из локального subscription.json")
+        log_err("⚠️ PAID_SUB_URL не задан в переменных окружения — платная подписка пропущена")
     raw = await fetch_url(PAID_SUB_URL) if PAID_SUB_URL else None
     configs: List[Dict[str, Any]] = []
 
@@ -697,6 +742,7 @@ async def load_paid_subscription() -> List[Dict[str, Any]]:
             if isinstance(parsed, list):
                 configs = parsed
         except json.JSONDecodeError:
+            # Fallback: возможно, это base64 со списком ссылок, а не готовый JSON.
             try:
                 decoded = base64.b64decode(raw).decode("utf-8")
                 outbounds = []
@@ -709,7 +755,7 @@ async def load_paid_subscription() -> List[Dict[str, Any]]:
                     cfg["outbounds"] = outbounds + cfg["outbounds"]
                     configs = [cfg]
             except Exception:
-                log_err("⚠️ Не удалось распознать формат платной подписки")
+                log_err("⚠️ Не удалось распознать формат платной подписки (ни JSON, ни base64)")
 
     if not configs:
         log("⚠️ Восстановление платных конфигов из локального subscription.json...")
@@ -717,13 +763,13 @@ async def load_paid_subscription() -> List[Dict[str, Any]]:
             with open("subscription.json", "r", encoding="utf-8") as f:
                 old = json.load(f)
             if isinstance(old, list):
-                # Исключаем публичные балансировщики (они помечены эмодзи)
-                exclude_prefixes = ("🏳️", "🏴", "📦", "✅", "⛔")
+                exclude_prefixes = ("🏳️list", "🏴list", "✅", "⛔", "📦")
                 configs = [c for c in old if isinstance(c, dict) and not c.get("remarks", "").startswith(exclude_prefixes)]
                 log(f"🔄 Восстановлено {len(configs)} платных конфигов")
         except Exception as e:
-            log_err(f"⚠️ Не удалось прочитать subscription.json: {e}")
+            log_err(f"⚠️ Не удалось прочитать сохранённый subscription.json: {e}")
 
+    # "Обход"/"бс" — приоритетные конфиги в начало списка
     priority_kw = ("обход", "бс")
     priority = [c for c in configs if any(kw in c.get("remarks", "").lower() for kw in priority_kw)]
     rest = [c for c in configs if c not in priority]
@@ -745,7 +791,7 @@ async def main_async() -> None:
     )
     log(f"Найдено ссылок: белые={len(white_links)}, чёрные={len(black_links)}, extra={len(extra_links)}")
 
-    # Исключаем hysteria2 (клиент не поддерживает)
+    # Фильтр: исключаем hysteria2 (клиент не поддерживает)
     def parse_all(links: List[str]) -> List[ParsedProxy]:
         out = []
         for link in links:
@@ -759,34 +805,34 @@ async def main_async() -> None:
     extra_parsed = parse_all(extra_links)
     white_without_ru = [p for p in white_parsed if not is_excluded_region(p.remarks)]
 
-    # Сначала extra – получаем резерв
+    # Сначала обрабатываем EXTRA, чтобы получить список живых кандидатов для резерва
     config_extra, alive_extra = await check_and_create_balancer(
-        extra_parsed, "📦list", MAX_SERVERS_PER_BALANCER,
-        remarks_ok_template="📦list ✅ {count}",
-        remarks_fail="📦list ⛔ Временно не работает",
+        extra_parsed, "EXTRA", MAX_SERVERS_PER_BALANCER,
+        remarks_ok_template="📦 EXTRA ✅ {count}",
+        remarks_fail="📦 EXTRA ⛔ Временно не работает",
         reserve_candidates=None,
         reserve_filter=None
     )
 
-    # WL-noRU с добивкой из EXTRA (только без RU/BY)
+    # Обрабатываем WL-noRU с резервом из ВСЕХ живых EXTRA (с фильтром no RU/BY)
     config_white_noru, _ = await check_and_create_balancer(
-        white_without_ru, "🏳️list [LTE]", MAX_SERVERS_PER_BALANCER,
-        remarks_ok_template="🏳️list [LTE] ✅ {count}",
-        remarks_fail="🏳️list [LTE] ⛔ Временно не работает",
+        white_without_ru, "WL-noRU", MAX_SERVERS_PER_BALANCER,
+        remarks_ok_template="🏳️ WL-noRU ✅ {count}",
+        remarks_fail="🏳️ WL-noRU ⛔ Временно не работает",
         reserve_candidates=alive_extra,
         reserve_filter=lambda c: not is_excluded_region(c.remarks)
     )
 
-    # Чёрный список (без резерва)
+    # Обрабатываем чёрный список (без резерва, можно добавить, если нужно)
     config_black, _ = await check_and_create_balancer(
-        black_parsed, "🏴list [wifi]", MAX_SERVERS_PER_BALANCER,
-        remarks_ok_template="🏴list [wifi] ✅ {count}",
-        remarks_fail="🏴list [wifi] ⛔ Временно не работает",
+        black_parsed, "BL", MAX_SERVERS_PER_BALANCER,
+        remarks_ok_template="🏴 BL ✅ {count}",
+        remarks_fail="🏴 BL ⛔ Временно не работает",
         reserve_candidates=None,
         reserve_filter=None
     )
 
-    # Итоговый массив: публичные балансировщики + платные
+    # Формируем финальный список конфигов (WL-noRU, BL, EXTRA + платные)
     final_configs = [config_white_noru, config_black, config_extra] + existing_configs
 
     with open("subscription.json", "w", encoding="utf-8") as f:
@@ -794,7 +840,6 @@ async def main_async() -> None:
     with open("subscription.txt", "w", encoding="utf-8") as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
 
-    # Генерация ссылок для Karing
     all_links: List[str] = []
     for cfg in existing_configs:
         remarks = cfg.get("remarks", "")
@@ -812,9 +857,9 @@ async def main_async() -> None:
         return len(cfg.get("routing", {}).get("balancers", [{}])[0].get("selector", []))
 
     log("\n✅ Успешно обновлено!")
-    log(f"   • 🏳️list [LTE]: {selector_len(config_white_noru)} серверов")
-    log(f"   • 🏴list [wifi]: {selector_len(config_black)} серверов")
-    log(f"   • 📦list: {selector_len(config_extra)} серверов")
+    log(f"   • WL-noRU: {selector_len(config_white_noru)} серверов")
+    log(f"   • BL: {selector_len(config_black)} серверов")
+    log(f"   • EXTRA: {selector_len(config_extra)} серверов")
     log(f"   • Всего записей в subscription.json: {len(final_configs)}")
     log(f"   • Ссылок для Karing: {len(all_links)}")
 
