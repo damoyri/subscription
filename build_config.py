@@ -846,7 +846,6 @@ async def main_async() -> None:
     log(f"   • BL: {selector_len(config_black)} серверов")
     log(f"   • EXTRA: {selector_len(config_extra)} серверов")
     log(f"   • Всего записей в subscription.json: {len(final_configs)}")
-    log(f"   • Ссылок для Karing: {len(all_links)}")
 
 
 def main() -> None:
