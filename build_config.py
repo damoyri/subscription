@@ -837,21 +837,6 @@ async def main_async() -> None:
 
     with open("subscription.json", "w", encoding="utf-8") as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
-    with open("subscription.txt", "w", encoding="utf-8") as f:
-        json.dump(final_configs, f, indent=2, ensure_ascii=False)
-
-    all_links: List[str] = []
-    for cfg in existing_configs:
-        remarks = cfg.get("remarks", "")
-        for ob in cfg.get("outbounds", []):
-            link = generate_link(ob, remarks)
-            if link:
-                all_links.append(link)
-    all_links = list(dict.fromkeys(all_links))
-    with open("sub2.txt", "w", encoding="utf-8") as f:
-        f.write("\n".join(all_links))
-    with open("sub2.json", "w", encoding="utf-8") as f:
-        f.write("\n".join(all_links))
 
     def selector_len(cfg: Dict[str, Any]) -> int:
         return len(cfg.get("routing", {}).get("balancers", [{}])[0].get("selector", []))
