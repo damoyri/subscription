@@ -30,9 +30,9 @@ SOURCES = [
     "https://github.com/nikita29a/FreeProxyList/raw/refs/heads/main/mirror/1.txt",
 ]
 
-TOP_K = 67                 # сколько лучших конфигов оставить
-TCP_TIMEOUT = 1.5          # таймаут TCP-пинга (сек)
-MAX_CONCURRENT = 20        # параллельных проверок
+TOP_K = 42                 # сколько лучших конфигов оставить
+TCP_TIMEOUT = 2.5          # таймаут TCP-пинга (сек)
+MAX_CONCURRENT = 50        # параллельных проверок
 
 # Ключевые слова для исключения (регистронезависимо)
 EXCLUDED_KEYWORDS = [
