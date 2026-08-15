@@ -55,11 +55,11 @@ EXTRA_URLS = [
 ]
 
 TCP_TIMEOUT = 5.0
-SINGBOX_PORT_WAIT = 8.0          # сколько ждём открытия SOCKS-порта sing-box (не используется)
+SINGBOX_PORT_WAIT = 8.0          # не используется
 SINGBOX_CURL_TIMEOUT = 15.0      # не используется
-MAX_FOR_SINGBOX = 150            # сколько лучших по TCP-пингу берём для балансировщика
-MAX_SERVERS_PER_BALANCER = 100
-CONCURRENCY_LIMIT = 8            # не используется, но оставлено для совместимости
+MAX_FOR_SINGBOX = 150            # сколько лучших по TCP-пингу берём для каждого источника
+MAX_SERVERS_PER_BALANCER = 100   # целевое количество серверов в каждом балансировщике
+CONCURRENCY_LIMIT = 8            # не используется
 BASE_TEST_PORT = 20000           # не используется
 VALID_FINGERPRINTS = {"chrome", "firefox", "edge", "safari", "ios", "android", "qq", "random"}
 EXCLUDE_PATTERN = re.compile(r"(Россия|anycast|Беларусь|🇷🇺|🇧🇾|Russia|Belarus)", re.IGNORECASE)
@@ -656,14 +656,20 @@ async def check_and_create_balancer(
     max_servers: int = MAX_SERVERS_PER_BALANCER,
     remarks_ok_template: str = "✅ {name} (рабочих: {count})",
     remarks_fail: str = "⛔ Временно не работает",
-) -> Dict[str, Any]:
+    reserve_candidates: Optional[List[Candidate]] = None,
+) -> Tuple[Dict[str, Any], List[Candidate]]:
+    """
+    Создаёт балансировщик из parsed_candidates, используя TCP-пинг.
+    Если после отбора лучших по TCP меньше max_servers, добирает из reserve_candidates.
+    Возвращает (config, all_alive_candidates) — все живые кандидаты (для использования как резерв).
+    """
     log(f"\n🔍 Проверка источника: {source_name} (всего {len(parsed_candidates)} конфигов)")
     fail_config = strip_balancer_for_empty(create_config_template(remarks_fail))
 
     if not parsed_candidates:
-        return fail_config
+        return fail_config, []
 
-    # Этап 1: параллельный TCP-пинг (отсекаем мёртвые адреса)
+    # Этап 1: параллельный TCP-пинг
     ping_tasks = [tcp_ping(p.address, p.port) for p in parsed_candidates]
     ping_results = await asyncio.gather(*ping_tasks, return_exceptions=False)
     alive = [
@@ -672,16 +678,24 @@ async def check_and_create_balancer(
     ]
     log(f"   ✅ После TCP-пинга: {len(alive)} живых")
     if not alive:
-        return fail_config
+        return fail_config, []
 
     alive.sort(key=lambda c: c.rtt)
     shortlist = alive[:MAX_FOR_SINGBOX]
     log(f"   🔍 Для балансировщика отобрано {len(shortlist)} лучших по TCP")
 
-    # ⚠️ ВРЕМЕННО: пропускаем проверку через sing-box, используем только TCP-пинг
-    log("   ⚠️ Реальная проверка через sing-box ОТКЛЮЧЕНА – используем TCP RTT")
+    # Берём максимум из shortlist и резерва
     best = shortlist[:max_servers]
-    log(f"   🏆 Отобрано {len(best)} лучших для балансировщика")
+    if len(best) < max_servers and reserve_candidates:
+        needed = max_servers - len(best)
+        # Исключаем уже использованные (по адресу+порт)
+        used_addrs = {(c.address, c.port) for c in best}
+        extra_from_reserve = [c for c in reserve_candidates if (c.address, c.port) not in used_addrs]
+        take = extra_from_reserve[:needed]
+        best.extend(take)
+        log(f"   ➕ Добавлено {len(take)} из резерва (extra)")
+
+    log(f"   🏆 Итоговое количество: {len(best)}")
 
     outbounds, tags = [], []
     for idx, cand in enumerate(best, start=1):
@@ -698,7 +712,7 @@ async def check_and_create_balancer(
     ]
     config["routing"]["balancers"][0]["selector"] = tags
     config["burstObservatory"]["subjectSelector"] = tags
-    return config
+    return config, alive
 
 
 # ============================================================================
@@ -766,6 +780,7 @@ async def main_async() -> None:
     )
     log(f"Найдено ссылок: белые={len(white_links)}, чёрные={len(black_links)}, extra={len(extra_links)}")
 
+    # Фильтр: исключаем hysteria2 (клиент не поддерживает)
     def parse_all(links: List[str]) -> List[ParsedProxy]:
         out = []
         for link in links:
@@ -779,19 +794,37 @@ async def main_async() -> None:
     extra_parsed = parse_all(extra_links)
     white_without_ru = [p for p in white_parsed if not is_excluded_region(p.remarks)]
 
-    config_white_all, config_white_noru, config_black, config_extra = await asyncio.gather(
-        check_and_create_balancer(white_parsed, "Белый список (все)", 100,
-                                   "🏳️list [LTE] ✅ {name} (рабочих: {count})",
-                                   "🏳️list [LTE] ⛔ Временно не работает"),
-        check_and_create_balancer(white_without_ru, "Белый список (без RU/BY)", 100,
-                                   "🏳️list [LTE] NoRU/BY ✅ {name} (рабочих: {count})",
-                                   "🏳️list [LTE] NoRU/BY ⛔ Временно не работает"),
-        check_and_create_balancer(black_parsed, "Чёрный список", 100,
-                                   "🏴list [wifi] ✅ {name} (рабочих: {count})",
-                                   "🏴list [wifi] ⛔ Временно не работает"),
-        check_and_create_balancer(extra_parsed, "26.txt", 100,
-                                   "📦 extra list (26.txt) ✅ {name} (рабочих: {count})",
-                                   "📦 extra list (26.txt) ⛔ Временно не работает"),
+    # Сначала обрабатываем extra, чтобы получить список живых кандидатов для резерва
+    config_extra, alive_extra = await check_and_create_balancer(
+        extra_parsed, "EXTRA", MAX_SERVERS_PER_BALANCER,
+        remarks_ok_template="📦 EXTRA ✅ {count}",
+        remarks_fail="📦 EXTRA ⛔ Временно не работает",
+        reserve_candidates=None
+    )
+
+    # Резерв для других списков: все кандидаты extra, кроме тех, кто попал в top MAX_SERVERS_PER_BALANCER
+    reserve = alive_extra[MAX_SERVERS_PER_BALANCER:] if len(alive_extra) > MAX_SERVERS_PER_BALANCER else []
+
+    # Обрабатываем остальные источники с резервом
+    config_white_all, _ = await check_and_create_balancer(
+        white_parsed, "WL", MAX_SERVERS_PER_BALANCER,
+        remarks_ok_template="🏳️ WL ✅ {count}",
+        remarks_fail="🏳️ WL ⛔ Временно не работает",
+        reserve_candidates=reserve
+    )
+
+    config_white_noru, _ = await check_and_create_balancer(
+        white_without_ru, "WL-noRU", MAX_SERVERS_PER_BALANCER,
+        remarks_ok_template="🏳️ WL-noRU ✅ {count}",
+        remarks_fail="🏳️ WL-noRU ⛔ Временно не работает",
+        reserve_candidates=reserve
+    )
+
+    config_black, _ = await check_and_create_balancer(
+        black_parsed, "BL", MAX_SERVERS_PER_BALANCER,
+        remarks_ok_template="🏴 BL ✅ {count}",
+        remarks_fail="🏴 BL ⛔ Временно не работает",
+        reserve_candidates=reserve
     )
 
     final_configs = [config_white_all, config_white_noru, config_black, config_extra] + existing_configs
@@ -817,10 +850,10 @@ async def main_async() -> None:
         return len(cfg.get("routing", {}).get("balancers", [{}])[0].get("selector", []))
 
     log("\n✅ Успешно обновлено!")
-    log(f"   • Белый список (все): {selector_len(config_white_all)} рабочих")
-    log(f"   • Белый список (без RU/BY): {selector_len(config_white_noru)} рабочих")
-    log(f"   • Чёрный список: {selector_len(config_black)} рабочих")
-    log(f"   • extra список (26.txt): {selector_len(config_extra)} рабочих")
+    log(f"   • WL: {selector_len(config_white_all)} серверов")
+    log(f"   • WL-noRU: {selector_len(config_white_noru)} серверов")
+    log(f"   • BL: {selector_len(config_black)} серверов")
+    log(f"   • EXTRA: {selector_len(config_extra)} серверов")
     log(f"   • Всего записей в subscription.json: {len(final_configs)}")
     log(f"   • Ссылок для Karing: {len(all_links)}")
 
@@ -829,7 +862,6 @@ def main() -> None:
     try:
         asyncio.run(main_async())
     except Exception as e:
-        # Никогда не печатаем полный traceback — он может содержать секреты из URL.
         log_err(f"❌ Критическая ошибка: {mask_secret(str(e))}")
         sys.exit(1)
 
