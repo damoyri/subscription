@@ -23,7 +23,7 @@ jobs:
       - name: Run update script
         env:
           PAID_SUB_URL: ${{ secrets.PAID_SUB_URL }}
-        run: python update_subscription.py
+        run: python update_sub2.py
 
       - name: Commit and push changes
         run: |
