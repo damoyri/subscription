@@ -80,10 +80,17 @@ jobs:
             echo "Bitbucket SSH key not set, skipping"
             exit 0
           fi
+          
           mkdir -p ~/.ssh
           echo "$BITBUCKET_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
-          git remote get-url bitbucket || git remote add bitbucket git@bitbucket.org:damoyri/subscription.git
-          git push --all bitbucket
-          git push --tags bitbucket
+          
+          # Тихо проверяем, добавлен ли remote, чтобы не мусорить красными ошибками в лог
+          if ! git remote get-url bitbucket > /dev/null 2>&1; then
+            git remote add bitbucket git@bitbucket.org:damoyri/subscription.git
+          fi
+          
+          # Пушим с форсом (перезаписываем историю на Bitbucket)
+          git push --force --all bitbucket
+          git push --force --tags bitbucket
