@@ -98,10 +98,16 @@ def strip_balancer_for_empty(config):
     return config
 
 def create_single_outbound_config(outbound, remarks):
-    """Создаёт конфиг для одного outbound'а с балансировщиком из одного сервера.
-       Если remarks не передан, берёт из outbound.get('remarks') или ставит стандартный."""
+    """Создаёт конфиг для одного outbound'а с балансировщиком из одного сервера."""
     if not remarks:
-        remarks = outbound.get("remarks", "Платная подписка")
+        # Пробуем взять из разных полей
+        remarks = (
+            outbound.get("remarks") or
+            outbound.get("serverName") or
+            outbound.get("address") or
+            outbound.get("server") or
+            "Платная подписка"
+        )
     config = create_config_template(remarks)
     ob_copy = json.loads(json.dumps(outbound))
     tag = "paid-1"
@@ -164,6 +170,8 @@ class VlessHandler(ProtocolHandler):
                 }
             else:
                 outbound["streamSettings"]["tlsSettings"] = {"allowInsecure": False, "serverName": params.get("sni", address), "fingerprint": fingerprint}
+            # Сохраняем remarks в outbound для дальнейшего использования
+            outbound["remarks"] = remarks
             return ParsedProxy(outbound, remarks, address, port)
         except Exception: return None
     def generate(self, outbound, remarks):
@@ -216,6 +224,7 @@ class Hysteria2Handler(ProtocolHandler):
                     "fingerprint": fingerprint, "insecure": insecure, "alpn": alpn_list,
                 }]},
             }
+            outbound["remarks"] = remarks
             return ParsedProxy(outbound, remarks, address, port)
         except Exception: return None
     def generate(self, outbound, remarks):
@@ -256,6 +265,7 @@ class TrojanHandler(ProtocolHandler):
                     "allowInsecure": params.get("allowInsecure", ["0"])[0] == "1",
                 }]},
             }
+            outbound["remarks"] = remarks
             return ParsedProxy(outbound, remarks, address, port)
         except Exception: return None
     def generate(self, outbound, remarks):
@@ -296,6 +306,7 @@ class ShadowsocksHandler(ProtocolHandler):
                 "tag": None, "protocol": "shadowsocks",
                 "settings": {"servers": [{"address": address, "port": port, "method": method, "password": password}]},
             }
+            outbound["remarks"] = remarks
             return ParsedProxy(outbound, remarks, address, port)
         except Exception: return None
     def generate(self, outbound, remarks):
@@ -346,6 +357,7 @@ class VmessHandler(ProtocolHandler):
                     "fingerprint": clean_fingerprint(cfg.get("fp")),
                     "allowInsecure": False,
                 }
+            outbound["remarks"] = remarks
             return ParsedProxy(outbound, remarks, address, port)
         except Exception: return None
     def generate(self, outbound, remarks):
@@ -468,7 +480,7 @@ async def check_and_create_balancer(parsed_candidates, source_name, max_servers=
     config["burstObservatory"]["subjectSelector"] = tags
     return config, alive
 
-# ===== Загрузка платной подписки =====
+# ===== Загрузка платной подписки (исправленная) =====
 def _extract_server_from_dict(item):
     address = item.get("server") or item.get("address") or item.get("host")
     port = item.get("port") or item.get("port_number")
@@ -513,13 +525,15 @@ async def load_paid_subscription() -> List[Dict[str, Any]]:
         data = json.loads(raw)
         if isinstance(data, list):
             ready_configs = []
-            outbound_list = []
+            outbound_list = []  # будем хранить пары (outbound, remarks)
             for item in data:
                 if isinstance(item, dict):
                     if "outbounds" in item and "routing" in item:
                         ready_configs.append(item)
                     elif "protocol" in item or "settings" in item:
-                        outbound_list.append(item)
+                        # Это outbound, возможно с remarks
+                        remarks = item.get("remarks", "")
+                        outbound_list.append((item, remarks))
                     else:
                         srv = _extract_server_from_dict(item)
                         if srv:
@@ -528,13 +542,14 @@ async def load_paid_subscription() -> List[Dict[str, Any]]:
                                 "settings": {"servers": [{"address": srv["address"], "port": srv["port"]}]},
                                 "remarks": srv.get("remarks", "")
                             }
-                            outbound_list.append(fake_ob)
+                            outbound_list.append((fake_ob, srv.get("remarks", "")))
             if ready_configs:
                 return _filter_and_sort_paid_configs(ready_configs)
             elif outbound_list:
                 configs = []
-                for ob in outbound_list:
-                    remarks = ob.get("remarks", "") or "Платная подписка"
+                for ob, remarks in outbound_list:
+                    if not remarks:
+                        remarks = ob.get("remarks", "")
                     configs.append(create_single_outbound_config(ob, remarks))
                 return _filter_and_sort_paid_configs(configs)
             else:
@@ -562,26 +577,28 @@ async def load_paid_subscription() -> List[Dict[str, Any]]:
         else:
             log_err("⚠️ Неожиданный тип JSON")
     except json.JSONDecodeError:
-        # Пробуем Base64
+        # Пробуем Base64 (или plain text)
         try:
             decoded = base64.b64decode(raw).decode("utf-8")
-            outbounds = []
-            for line in decoded.splitlines():
-                line = line.strip()
-                if line:
-                    pp = parse_proxy_url(line)
-                    if pp:
-                        outbounds.append(pp.outbound)
-            if outbounds:
-                configs = []
-                for ob in outbounds:
-                    remarks = ob.get("remarks", "") or "Платная подписка"
-                    configs.append(create_single_outbound_config(ob, remarks))
-                return _filter_and_sort_paid_configs(configs)
-            else:
-                log_err("⚠️ Base64 не содержит валидных ссылок")
-        except Exception as e:
-            log_err(f"⚠️ Ошибка декодирования Base64: {e}")
+        except Exception:
+            # Если не Base64, возможно это просто plain text список ссылок
+            decoded = raw
+        parsed_items = []
+        for line in decoded.splitlines():
+            line = line.strip()
+            if line:
+                pp = parse_proxy_url(line)
+                if pp:
+                    parsed_items.append((pp.outbound, pp.remarks))
+        if parsed_items:
+            configs = []
+            for ob, remarks in parsed_items:
+                if not remarks:
+                    remarks = ob.get("remarks", "")
+                configs.append(create_single_outbound_config(ob, remarks))
+            return _filter_and_sort_paid_configs(configs)
+        else:
+            log_err("⚠️ Не удалось распарсить ссылки")
     return []
 
 # ===== main =====
