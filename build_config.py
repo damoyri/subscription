@@ -98,7 +98,11 @@ def strip_balancer_for_empty(config):
     return config
 
 def create_single_outbound_config(outbound, remarks):
-    config = create_config_template(remarks or "Платная подписка")
+    """Создаёт конфиг для одного outbound'а с балансировщиком из одного сервера.
+       Если remarks не передан, берёт из outbound.get('remarks') или ставит стандартный."""
+    if not remarks:
+        remarks = outbound.get("remarks", "Платная подписка")
+    config = create_config_template(remarks)
     ob_copy = json.loads(json.dumps(outbound))
     tag = "paid-1"
     ob_copy["tag"] = tag
@@ -131,7 +135,7 @@ class ProtocolHandler(ABC):
             remarks = urllib.parse.unquote(remarks.strip())
         return url_str, remarks
 
-# --- VlessHandler (сокращённо, полная логика) ---
+# --- VlessHandler ---
 class VlessHandler(ProtocolHandler):
     scheme = "vless://"
     def parse(self, raw_url):
@@ -188,10 +192,197 @@ class VlessHandler(ProtocolHandler):
             return url
         except Exception: return None
 
-# --- Другие обработчики (Hysteria2, Trojan, Shadowsocks, Vmess) опущены для краткости, они аналогичны и есть в исходнике.
-# В полной версии файла они все есть.
+# --- Hysteria2Handler ---
+class Hysteria2Handler(ProtocolHandler):
+    scheme = "hysteria2://"
+    def parse(self, raw_url):
+        url_str, remarks = self.split_remarks(raw_url)
+        if not url_str.startswith(self.scheme): return None
+        try:
+            parsed = urllib.parse.urlparse(url_str)
+            auth, address_raw, port = parsed.username, parsed.hostname, parsed.port or 443
+            if not auth or not address_raw: return None
+            address = normalize_address(address_raw)
+            params = urllib.parse.parse_qs(parsed.query)
+            sni = params.get("sni", [address])[0]
+            fingerprint = params.get("fingerprint", ["chrome"])[0]
+            insecure = params.get("insecure", ["0"])[0] == "1"
+            alpn = params.get("alpn", [None])[0]
+            alpn_list = alpn.split(",") if alpn else []
+            outbound = {
+                "tag": None, "protocol": "hysteria2",
+                "settings": {"servers": [{
+                    "address": address, "port": port, "auth": auth, "sni": sni,
+                    "fingerprint": fingerprint, "insecure": insecure, "alpn": alpn_list,
+                }]},
+            }
+            return ParsedProxy(outbound, remarks, address, port)
+        except Exception: return None
+    def generate(self, outbound, remarks):
+        try:
+            s = outbound["settings"]["servers"][0]
+            address, port, auth = s.get("address"), s.get("port"), s.get("auth")
+            if not (address and port and auth): return None
+            params = {}
+            if s.get("sni"): params["sni"] = s["sni"]
+            if s.get("fingerprint"): params["fingerprint"] = s["fingerprint"]
+            if s.get("insecure"): params["insecure"] = "1"
+            if s.get("alpn"): params["alpn"] = ",".join(s["alpn"])
+            addr_out = bracket_if_ipv6(address)
+            url = f"hysteria2://{auth}@{addr_out}:{port}"
+            if params: url += "?" + "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items())
+            if remarks: url += "#" + urllib.parse.quote(remarks)
+            return url
+        except Exception: return None
 
-PROTOCOL_REGISTRY = [VlessHandler()]  # остальные добавь по аналогии
+# --- TrojanHandler ---
+class TrojanHandler(ProtocolHandler):
+    scheme = "trojan://"
+    def parse(self, raw_url):
+        url_str, remarks = self.split_remarks(raw_url)
+        if not url_str.startswith(self.scheme): return None
+        try:
+            parsed = urllib.parse.urlparse(url_str)
+            password, address_raw, port = parsed.username, parsed.hostname, parsed.port or 443
+            if not password or not address_raw: return None
+            address = normalize_address(address_raw)
+            params = urllib.parse.parse_qs(parsed.query)
+            outbound = {
+                "tag": None, "protocol": "trojan",
+                "settings": {"servers": [{
+                    "address": address, "port": port, "password": password,
+                    "sni": params.get("sni", [address])[0],
+                    "fingerprint": params.get("fingerprint", ["chrome"])[0],
+                    "allowInsecure": params.get("allowInsecure", ["0"])[0] == "1",
+                }]},
+            }
+            return ParsedProxy(outbound, remarks, address, port)
+        except Exception: return None
+    def generate(self, outbound, remarks):
+        try:
+            s = outbound["settings"]["servers"][0]
+            address, port, password = s.get("address"), s.get("port"), s.get("password")
+            if not (address and port and password): return None
+            params = {}
+            if s.get("sni"): params["sni"] = s["sni"]
+            if s.get("fingerprint"): params["fingerprint"] = s["fingerprint"]
+            if s.get("allowInsecure"): params["allowInsecure"] = "1"
+            addr_out = bracket_if_ipv6(address)
+            url = f"trojan://{password}@{addr_out}:{port}"
+            if params: url += "?" + "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items())
+            if remarks: url += "#" + urllib.parse.quote(remarks)
+            return url
+        except Exception: return None
+
+# --- ShadowsocksHandler ---
+class ShadowsocksHandler(ProtocolHandler):
+    scheme = "ss://"
+    def parse(self, raw_url):
+        url_str, remarks = self.split_remarks(raw_url)
+        if not url_str.startswith(self.scheme): return None
+        try:
+            content = url_str[len(self.scheme):]
+            if "@" in content:
+                userinfo, hostport = content.split("@", 1)
+                decoded = base64.urlsafe_b64decode(userinfo + "=" * (-len(userinfo) % 4)).decode()
+                method, password = decoded.split(":", 1)
+            else:
+                decoded = base64.urlsafe_b64decode(content + "=" * (-len(content) % 4)).decode()
+                userinfo, hostport = decoded.split("@", 1)
+                method, password = userinfo.split(":", 1)
+            address_raw, port_str = hostport.rsplit(":", 1)
+            address, port = normalize_address(address_raw), int(port_str)
+            outbound = {
+                "tag": None, "protocol": "shadowsocks",
+                "settings": {"servers": [{"address": address, "port": port, "method": method, "password": password}]},
+            }
+            return ParsedProxy(outbound, remarks, address, port)
+        except Exception: return None
+    def generate(self, outbound, remarks):
+        try:
+            s = outbound["settings"]["servers"][0]
+            address, port = s.get("address"), s.get("port")
+            method, password = s.get("method"), s.get("password")
+            if not all([address, port, method, password]): return None
+            b64 = base64.urlsafe_b64encode(f"{method}:{password}".encode()).decode().rstrip("=")
+            addr_out = bracket_if_ipv6(address)
+            url = f"ss://{b64}@{addr_out}:{port}"
+            if remarks: url += "#" + urllib.parse.quote(remarks)
+            return url
+        except Exception: return None
+
+# --- VmessHandler ---
+class VmessHandler(ProtocolHandler):
+    scheme = "vmess://"
+    def parse(self, raw_url):
+        url_str, remarks = self.split_remarks(raw_url)
+        if not url_str.startswith(self.scheme): return None
+        try:
+            b64 = url_str[len(self.scheme):]
+            b64 += "=" * (-len(b64) % 4)
+            cfg = json.loads(base64.urlsafe_b64decode(b64).decode())
+            address, uuid = cfg.get("add", ""), cfg.get("id", "")
+            if not address or not uuid: return None
+            port = int(cfg.get("port", 443))
+            address = normalize_address(address)
+            network, tls = cfg.get("net", "tcp"), cfg.get("tls", "")
+            outbound = {
+                "tag": None, "protocol": "vmess",
+                "settings": {"vnext": [{"address": address, "port": port,
+                                        "users": [{"id": uuid, "alterId": int(cfg.get("aid", 0)),
+                                                   "security": cfg.get("scy", "auto"), "level": 8}]}]},
+                "streamSettings": {"network": network, "security": "tls" if tls == "tls" else "none"},
+            }
+            host, path = cfg.get("host", ""), cfg.get("path", "")
+            if network == "ws":
+                ws = {"path": path}
+                if host: ws["headers"] = {"Host": host}
+                outbound["streamSettings"]["wsSettings"] = ws
+            elif network == "grpc":
+                outbound["streamSettings"]["grpcSettings"] = {"serviceName": path.lstrip("/")}
+            if tls == "tls":
+                outbound["streamSettings"]["tlsSettings"] = {
+                    "serverName": cfg.get("sni") or address,
+                    "fingerprint": clean_fingerprint(cfg.get("fp")),
+                    "allowInsecure": False,
+                }
+            return ParsedProxy(outbound, remarks, address, port)
+        except Exception: return None
+    def generate(self, outbound, remarks):
+        try:
+            vnext = outbound["settings"]["vnext"][0]
+            user = vnext["users"][0]
+            stream = outbound.get("streamSettings", {})
+            network, tls = stream.get("network", "tcp"), stream.get("security", "none")
+            cfg = {
+                "v": "2", "ps": remarks or "", "add": vnext["address"], "port": vnext["port"],
+                "id": user["id"], "aid": user.get("alterId", 0), "scy": user.get("security", "auto"),
+                "net": network, "type": "none", "host": "", "path": "",
+                "tls": "tls" if tls == "tls" else "", "sni": "", "fp": "chrome",
+            }
+            if network == "ws":
+                ws = stream.get("wsSettings", {})
+                cfg["path"] = ws.get("path", "")
+                cfg["host"] = ws.get("headers", {}).get("Host", "")
+            elif network == "grpc":
+                cfg["path"] = stream.get("grpcSettings", {}).get("serviceName", "")
+            if tls == "tls":
+                t = stream.get("tlsSettings", {})
+                cfg["sni"], cfg["fp"] = t.get("serverName", ""), t.get("fingerprint", "chrome")
+            b64 = base64.urlsafe_b64encode(json.dumps(cfg).encode()).decode().rstrip("=")
+            url = f"vmess://{b64}"
+            if remarks: url += "#" + urllib.parse.quote(remarks)
+            return url
+        except Exception: return None
+
+# Реестр обработчиков (все протоколы)
+PROTOCOL_REGISTRY = [
+    VlessHandler(),
+    Hysteria2Handler(),
+    TrojanHandler(),
+    ShadowsocksHandler(),
+    VmessHandler(),
+]
 
 def parse_proxy_url(raw_url):
     url = raw_url.strip()
@@ -277,7 +468,7 @@ async def check_and_create_balancer(parsed_candidates, source_name, max_servers=
     config["burstObservatory"]["subjectSelector"] = tags
     return config, alive
 
-# ===== Загрузка платной подписки (исправленная) =====
+# ===== Загрузка платной подписки =====
 def _extract_server_from_dict(item):
     address = item.get("server") or item.get("address") or item.get("host")
     port = item.get("port") or item.get("port_number")
