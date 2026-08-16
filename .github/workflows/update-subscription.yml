@@ -1,34 +1,41 @@
-name: Update best VPN links (no RU/BY)
+name: Update VPN Subscriptions
 
 on:
   schedule:
-    - cron: '0 */2 * * *'   # каждые 6 часов
-  workflow_dispatch:
+    # Каждые 2 часа с 7 до 23 по Омску (UTC+5) = UTC 2-18
+    - cron: '0 2,4,6,8,10,12,14,16,18 * * *'
+  workflow_dispatch:  # Ручной запуск через GitHub UI
 
 jobs:
-  update:
+  update-subs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
+    
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl
-
-      - name: Pull latest changes
-        run: git pull --rebase origin main || echo "No upstream changes"
-
-      - name: Run updater
-        run: python3 update_subscription.py
-
-      - name: Commit and push results
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add best_ping.txt
-          git commit -m "Обновлены лучшие ссылки по пингу (без РФ/РБ)" || echo "Нет изменений"
-          git push origin main
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Install sing-box
+      run: |
+        curl -fsSL https://sing-box.app/gpg.key -o /etc/apt/keyrings/sagernet.asc
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/sagernet.asc] https://deb.sagernet.org/ * *" | tee /etc/apt/sources.list.d/sagernet.list
+        apt-get update
+        apt-get install -y sing-box
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Run subscription updater
+      run: python3 update_subscription.py
+    
+    - name: Commit and push changes
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add best_ping.txt
+        git diff --cached --quiet || (git commit -m "Auto-update subscriptions $(date '+%Y-%m-%d %H:%M')" && git push)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
