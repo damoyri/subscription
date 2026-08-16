@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 update_subscription.py – скачивает VPN-ссылки, исключает конфиги с пометкой Россия/Беларусь,
-проверяет TCP-пинг оставшихся, сохраняет TOP_K с минимальной задержкой.
+проверяет реальную работоспособность через sing‑box (HTTP-запрос через прокси),
+сохраняет TOP_K с минимальной задержкой.
 Выходной файл: best_ping.txt (одна ссылка на строку).
 Автоматически коммитит и пушит изменения в репозиторий.
 """
@@ -14,6 +15,9 @@ import urllib.parse
 from typing import Optional, List, Tuple
 import subprocess
 import datetime
+import tempfile
+import os
+import time
 
 # ========================== НАСТРОЙКИ ==========================
 SOURCES = [
@@ -31,11 +35,14 @@ SOURCES = [
 ]
 
 TOP_K = 42                 # сколько лучших конфигов оставить
-TCP_TIMEOUT = 2.5          # таймаут TCP-пинга (сек)
+TCP_TIMEOUT = 7.0          # таймаут для реальной проверки (сек)
 MAX_CONCURRENT = 50        # параллельных проверок
 
 # Ключевые слова для исключения (регистронезависимо)
-EXCLUDED_KEYWORDS = []
+EXCLUDED_KEYWORDS = [
+    "россия", "беларусь", "russia", "belarus",
+    "🇷🇺", "🇧🇾", "ru"          # anycast убрали – не исключаем
+]
 
 # ======================== ПАРСЕРЫ ПРОТОКОЛОВ ========================
 def parse_proxy_url(url: str) -> Optional[Tuple[str, int]]:
@@ -126,22 +133,140 @@ def is_excluded(link: str) -> bool:
             return True
     return False
 
-# ======================== TCP-ПИНГ ========================
-async def tcp_ping(host: str, port: int, timeout: float = TCP_TIMEOUT) -> Optional[float]:
-    start = asyncio.get_event_loop().time()
+# ======================== ГЕНЕРАТОР КОНФИГА SING-BOX ========================
+def generate_singbox_config(link: str) -> Optional[str]:
+    """Создаёт временный конфиг sing-box для прокси-ссылки, возвращает путь к файлу"""
+    parsed = parse_proxy_url(link)
+    if not parsed:
+        return None
+    host, port = parsed
+
+    # Базовая структура конфига
+    config = {
+        "log": {"level": "error"},
+        "inbounds": [
+            {
+                "type": "socks",
+                "listen": "127.0.0.1",
+                "listen_port": 1080,
+                "tag": "socks-in"
+            }
+        ],
+        "outbounds": [
+            {
+                "type": "direct",
+                "tag": "direct"
+            }
+        ]
+    }
+
+    # Парсим параметры в зависимости от протокола
+    if link.startswith("vless://"):
+        p = urllib.parse.urlparse(link)
+        uuid = p.username or ""
+        server = p.hostname
+        server_port = p.port or 443
+        params = dict(urllib.parse.parse_qsl(p.query))
+        outbound = {
+            "type": "vless",
+            "server": server,
+            "server_port": server_port,
+            "uuid": uuid,
+            "flow": params.get("flow", ""),
+            "tls": {
+                "enabled": params.get("security", "") == "tls" or params.get("tls", "") == "tls",
+                "server_name": params.get("sni", server),
+                "utls": {"enabled": True, "fingerprint": "chrome"}
+            },
+            "transport": {
+                "type": params.get("type", "tcp"),
+                "path": params.get("path", ""),
+                "host": params.get("host", "")
+            }
+        }
+        config["outbounds"].append(outbound)
+
+    elif link.startswith("trojan://"):
+        p = urllib.parse.urlparse(link)
+        password = p.username or ""
+        server = p.hostname
+        server_port = p.port or 443
+        params = dict(urllib.parse.parse_qsl(p.query))
+        outbound = {
+            "type": "trojan",
+            "server": server,
+            "server_port": server_port,
+            "password": password,
+            "tls": {
+                "enabled": True,
+                "server_name": params.get("sni", server),
+                "utls": {"enabled": True, "fingerprint": "chrome"}
+            },
+            "transport": {
+                "type": params.get("type", "tcp"),
+                "path": params.get("path", ""),
+                "host": params.get("host", "")
+            }
+        }
+        config["outbounds"].append(outbound)
+
+    else:
+        # Для vmess, ss, hysteria2 — не реализовано, пропускаем
+        return None
+
+    # Сохраняем во временный файл
     try:
-        reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(host, port),
-            timeout=timeout
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(config, f)
+            return f.name
+    except Exception:
+        return None
+
+# ======================== РЕАЛЬНАЯ ПРОВЕРКА ЧЕРЕЗ SING-BOX ========================
+async def real_check(link: str, timeout: float = TCP_TIMEOUT) -> Optional[float]:
+    """Проверяет конфиг через sing-box и реальный HTTP-запрос к google.com"""
+    config_path = generate_singbox_config(link)
+    if not config_path:
+        return None
+
+    # Запускаем sing-box
+    proc = await asyncio.create_subprocess_exec(
+        "sing-box", "run", "-c", config_path,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL
+    )
+    # Даём время подняться (0.5 сек достаточно)
+    await asyncio.sleep(0.5)
+
+    # Пытаемся сделать curl через прокси
+    start = asyncio.get_event_loop().time()
+    success = False
+    try:
+        curl_proc = await asyncio.create_subprocess_exec(
+            "curl", "-x", "socks5://127.0.0.1:1080",
+            "https://google.com", "-m", str(int(timeout)),
+            "--connect-timeout", str(int(timeout)),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL
         )
-        writer.close()
+        await asyncio.wait_for(curl_proc.wait(), timeout=timeout)
+        if curl_proc.returncode == 0:
+            success = True
+    except asyncio.TimeoutError:
+        pass
+    finally:
+        # Завершаем sing-box
+        proc.terminate()
+        await proc.wait()
+        # Удаляем временный файл
         try:
-            await writer.wait_closed()
+            os.unlink(config_path)
         except:
             pass
+
+    if success:
         return asyncio.get_event_loop().time() - start
-    except:
-        return None
+    return None
 
 # ======================== ЗАГРУЗКА СПИСКОВ ========================
 async def fetch_url(url: str, timeout: float = 10.0) -> Optional[str]:
@@ -184,28 +309,27 @@ async def main():
         print("❌ После фильтрации не осталось ни одной ссылки!")
         sys.exit(1)
 
+    # Собираем кандидатов (только те, что поддерживаются sing-box: vless, trojan)
     candidates = []
     for link in filtered_links:
-        parsed = parse_proxy_url(link)
-        if parsed:
-            addr, port = parsed
-            candidates.append({
-                "link": link,
-                "addr": addr,
-                "port": port,
-            })
-    print(f"🧩 Распознано {len(candidates)} конфигов, проверяем пинг...")
+        if link.startswith(("vless://", "trojan://")):
+            candidates.append({"link": link})
+    print(f"🧩 Распознано {len(candidates)} конфигов (vless/trojan), проверяем через sing-box...")
+
+    if not candidates:
+        print("❌ Нет конфигов для проверки!")
+        sys.exit(1)
 
     sem = asyncio.Semaphore(MAX_CONCURRENT)
 
     async def check_one(cand):
         async with sem:
-            rtt = await tcp_ping(cand["addr"], cand["port"])
+            rtt = await real_check(cand["link"])
             cand["rtt"] = rtt
             if rtt is not None:
                 print(f"   ✅ {cand['link'][:50]}... {rtt*1000:.1f} мс")
             else:
-                print(f"   ❌ {cand['link'][:50]}... таймаут")
+                print(f"   ❌ {cand['link'][:50]}... не работает")
         return cand
 
     tasks = [check_one(c) for c in candidates]
@@ -219,7 +343,7 @@ async def main():
     alive.sort(key=lambda x: x["rtt"])
     best = alive[:TOP_K]
 
-    print(f"\n🏆 Лучшие {len(best)} конфигов по пингу (без РФ/РБ):")
+    print(f"\n🏆 Лучшие {len(best)} конфигов по реальной задержке (без РФ/РБ):")
     for i, c in enumerate(best, 1):
         print(f"  {i}. {c['link'][:60]}...  {c['rtt']*1000:.1f} мс")
 
@@ -232,6 +356,8 @@ async def main():
     # ==================== АВТОМАТИЧЕСКИЙ PUSH НА GITHUB ====================
     try:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        # Сначала подтягиваем удалённые изменения (чтобы избежать конфликтов)
+        subprocess.run(["git", "pull", "origin", "main", "--no-rebase"], check=True, cwd=".")
         subprocess.run(["git", "add", "best_ping.txt"], check=True, cwd=".")
         subprocess.run(["git", "commit", "-m", f"Auto-update {timestamp}"], check=True, cwd=".")
         subprocess.run(["git", "push"], check=True, cwd=".")
