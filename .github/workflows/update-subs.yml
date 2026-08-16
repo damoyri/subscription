@@ -15,10 +15,9 @@ jobs:
       cancel-in-progress: true
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0          # ← полная история, чтобы push в Bitbucket работал
+          fetch-depth: 0          # <- ЕДИНСТВЕННОЕ ИЗМЕНЕНИЕ
 
       - name: Install dependencies
         run: |
@@ -29,9 +28,7 @@ jobs:
         run: |
           RELEASE_JSON=$(curl -s -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/SagerNet/sing-box/releases/latest)
-          
           DOWNLOAD_URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name | endswith("-linux-amd64.tar.gz") and (contains("glibc") or contains("musl") | not)) | .browser_download_url' | head -n1)
-          
           if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ]; then
             echo "Asset not found, trying fallback with version..."
             VERSION=$(echo "$RELEASE_JSON" | jq -r '.tag_name')
@@ -43,16 +40,13 @@ jobs:
               exit 1
             fi
           fi
-          
           echo "Downloading from: $DOWNLOAD_URL"
           curl -L -H "Accept: application/octet-stream" -H "User-Agent: curl" -o sing-box.tar.gz "$DOWNLOAD_URL"
-          
           if [ $(stat -c%s "sing-box.tar.gz") -lt 1000000 ]; then
             echo "Downloaded file too small, likely an error page"
             cat sing-box.tar.gz
             exit 1
           fi
-          
           tar -xzf sing-box.tar.gz --strip-components=1 -C /tmp $(tar -tzf sing-box.tar.gz | grep '/sing-box$')
           sudo mv /tmp/sing-box /usr/local/bin/sing-box
           sudo chmod +x /usr/local/bin/sing-box
@@ -84,7 +78,6 @@ jobs:
             exit 0
           fi
           
-          # Если по каким-то причинам репозиторий всё ещё shallow, делаем unshallow
           git fetch --unshallow || true
           
           mkdir -p ~/.ssh
