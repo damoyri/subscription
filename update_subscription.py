@@ -36,7 +36,7 @@ TOP_K = 42                 # сколько лучших конфигов ост
 TCP_PING_TIMEOUT = 1.5     # таймаут TCP-пинга (сек)
 SINGBOX_TIMEOUT = 7.0      # таймаут для реальной проверки (сек)
 MAX_CONCURRENT_PING = 100  # параллельных пингов
-MAX_CONCURRENT_SINGBOX = 50 # параллельных проверок sing-box
+MAX_CONCURRENT_SINGBOX = 50 # параллельных проверок sing-box (не используется в цикле, но оставлено)
 MAX_SINGBOX_CHECKS = 500   # максимум конфигов, которые проверим через sing-box
 
 # Ключевые слова для исключения (регистронезависимо)
@@ -231,18 +231,23 @@ def generate_singbox_config(link: str) -> Optional[str]:
     except Exception:
         return None
 
-# ======================== РЕАЛЬНАЯ ПРОВЕРКА ЧЕРЕЗ SING-BOX ========================
+# ======================== РЕАЛЬНАЯ ПРОВЕРКА ЧЕРЕЗ SING-BOX (ИСПРАВЛЕННАЯ) ========================
 async def real_check(link: str, timeout: float = SINGBOX_TIMEOUT) -> Optional[float]:
     config_path = generate_singbox_config(link)
     if not config_path:
         return None
 
-    proc = await asyncio.create_subprocess_exec(
-        "sing-box", "run", "-c", config_path,
-        stdout=asyncio.subprocess.DEVNULL,
-        stderr=asyncio.subprocess.DEVNULL
-    )
-    await asyncio.sleep(0.5)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "sing-box", "run", "-c", config_path,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL
+        )
+    except FileNotFoundError:
+        print("❌ sing-box не установлен! Установите: pkg install sing-box")
+        return None
+
+    await asyncio.sleep(0.5)  # даём время подняться
 
     start = asyncio.get_event_loop().time()
     success = False
@@ -260,8 +265,11 @@ async def real_check(link: str, timeout: float = SINGBOX_TIMEOUT) -> Optional[fl
     except asyncio.TimeoutError:
         pass
     finally:
-        proc.terminate()
-        await proc.wait()
+        # Проверяем, жив ли процесс, перед завершением
+        if proc.returncode is None:
+            proc.terminate()
+            await proc.wait()
+        # если returncode не None, процесс уже завершился
         try:
             os.unlink(config_path)
         except:
