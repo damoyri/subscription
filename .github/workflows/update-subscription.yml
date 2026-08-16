@@ -1,9 +1,9 @@
 name: update-subs
 
 on:
-  workflow_dispatch:                          # кнопка Run workflow
+  workflow_dispatch:
   schedule:
-    - cron: "0 1-17/2 * * *"                  # 7:00–23:00 Омск, каждые 2 ч
+    - cron: "0 1-17/2 * * *"   # 7:00–23:00 Омск, каждые 2 ч
 
 permissions:
   contents: write
@@ -21,8 +21,9 @@ jobs:
         run: |
           gh release download --repo SagerNet/sing-box \
             --pattern 'sing-box-*-linux-amd64*.tar.gz' --dir /tmp/sb
-          tar -xzf /tmp/sb/*.tar.gz -C /tmp/sb
-          DIR=$(ls -d /tmp/sb/sing-box-*/ | head -1)
+          for f in /tmp/sb/*.tar.gz; do tar -xzf "$f" -C /tmp/sb; done
+          DIR=$(ls -d /tmp/sb/sing-box-*-linux-amd64/ 2>/dev/null | head -1)
+          [ -z "$DIR" ] && DIR=$(ls -d /tmp/sb/sing-box-*/ | head -1)
           sudo install -m755 "${DIR}sing-box" /usr/local/bin/sing-box
           sing-box version
 
