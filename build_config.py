@@ -28,6 +28,7 @@ EXTRA_URLS = [
 TCP_TIMEOUT = 3.0            # Таймаут одного пинга
 MAX_FOR_SINGBOX = 150        # Шортлист
 MAX_SERVERS_PER_BALANCER = 100
+MAX_PING_PER_SOURCE = 3000   # Максимум сколько пингуем с одного списка
 RETRY_ATTEMPTS = 3           # Повторные попытки загрузки
 PING_BATCH = 300             # Сколько серверов пингуем одновременно
 
@@ -41,6 +42,7 @@ _SECRET_PATTERN = re.compile(
 )
 
 # ===== РУ-СЕРВИСЫ НАПРЯМУЮ =====
+# Сбер и Тинькофф УБРАНЫ — на Т2 и подобных не работают напрямую, пускай идут через VPN.
 RU_DIRECT_DOMAINS = [
     "yandex.ru", "yandex.com", "ya.ru", "dzen.ru", "dzen.com",
     "maps.yandex.ru", "taxi.yandex.ru", "eda.yandex.ru",
@@ -54,7 +56,7 @@ RU_DIRECT_DOMAINS = [
     "2gis.ru", "2gis.com", "drom.ru",
     "wildberries.ru", "wildberries.com", "ozon.ru", "avito.ru", "cian.ru",
     "gosuslugi.ru",
-    "vtb.ru", "alfabank.ru", "gazprombank.ru", "sberbank.ru", "tinkoff.ru",
+    "vtb.ru", "alfabank.ru", "gazprombank.ru",
     "uchi.ru", "dnevnik.ru",
     "yoomoney.ru", "mvideo.ru", "eldorado.ru", "detmir.ru",
     "mos.ru", "nalog.ru",
@@ -115,14 +117,12 @@ async def fetch_url(url, timeout=15.0):
 
 
 def create_config_template(remarks_text):
+    """Шаблон конфига. DNS как у платных (обычный, не DoH — мобилка его не душит).
+    Балансировщик: быстрые в приоритете, но если быстрых нет — берёт любые живые."""
     return {
         "log": {"loglevel": "warning"},
         "dns": {
-            "servers": [
-                "https://common.dot.dns.yandex.net/dns-query",
-                "https://dns.adguard.com/dns-query",
-                "https://1.1.1.1/dns-query",
-            ],
+            "servers": ["8.8.8.8", "9.9.9.9"],
             "queryStrategy": "UseIPv4"
         },
         "inbounds": [
@@ -132,7 +132,7 @@ def create_config_template(remarks_text):
                 "protocol": "socks",
                 "settings": {"auth": "noauth", "udp": True, "userLevel": 8},
                 "sniffing": {
-                    "destOverride": ["http", "tls"],
+                    "destOverride": ["http", "tls", "quic"],
                     "enabled": True,
                     "routeOnly": False
                 },
@@ -169,8 +169,12 @@ def create_config_template(remarks_text):
                 "strategy": {
                     "type": "leastLoad",
                     "settings": {
+                        # Потолок высокий — чтоб даже медленные, но живые сервера
+                        # использовались, когда быстрых не нашлось
                         "maxRTT": "10s",
-                        "expected": 1,
+                        # Держим 4 лучших, переключаемся при деградации
+                        "expected": 4,
+                        # Корзины скорости для бесплатных нестабильных серверов
                         "baselines": ["500ms", "1500ms", "3000ms"],
                         "tolerance": 0.1
                     }
@@ -180,10 +184,11 @@ def create_config_template(remarks_text):
         },
         "burstObservatory": {
             "pingConfig": {
-                "timeout": "10s",
-                "interval": "1m",
-                "sampling": 2,
-                "destination": "http://www.gstatic.com/generate_204"
+                "timeout": "3s",
+                "interval": "120s",
+                "sampling": 1,
+                "destination": "http://www.gstatic.com/generate_204",
+                "connectivity": ""
             },
             "subjectSelector": []
         },
@@ -738,6 +743,11 @@ async def check_and_create_balancer(
 ):
     log(f"\n🔍 Checking source: {source_name} (total {len(parsed_candidates)})")
 
+    # Не пингуем больше лимита — в балансировщик всё равно войдёт максимум 100
+    if len(parsed_candidates) > MAX_PING_PER_SOURCE:
+        log(f"   ✂️ Слишком много, беру первые {MAX_PING_PER_SOURCE}")
+        parsed_candidates = parsed_candidates[:MAX_PING_PER_SOURCE]
+
     fail_config = strip_balancer_for_empty(create_config_template(remarks_fail))
 
     if not parsed_candidates:
@@ -987,7 +997,7 @@ async def main_async():
     config_extra, alive_extra = await check_and_create_balancer(
         extra_parsed, "EXTRA", MAX_SERVERS_PER_BALANCER,
         remarks_ok_template="📦 EXTRA ✅ {count}",
-        remarks_fail="📦 EXTRA ⛔ Временно не работает",
+        remarks_fail="📦 EXTRA  Временно не работает",
     )
 
     config_white_noru, _ = await check_and_create_balancer(
@@ -1001,7 +1011,7 @@ async def main_async():
     config_black, _ = await check_and_create_balancer(
         black_parsed, "BL", MAX_SERVERS_PER_BALANCER,
         remarks_ok_template="🏴 BL ✅ {count}",
-        remarks_fail="🏴 BL  Временно не работает",
+        remarks_fail="🏴 BL ⛔ Временно не работает",
     )
 
     final_configs = [config_white_noru, config_black, config_extra] + paid_configs
