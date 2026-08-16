@@ -3,7 +3,7 @@
 update_subscription.py – скачивает VPN-ссылки, исключает конфиги с пометкой Россия/Беларусь,
 проверяет TCP-пинг, затем реальную работу через sing‑box, динамически добирая до TOP_K.
 Выходной файл: best_ping.txt (одна ссылка на строку).
-Автоматически коммитит и пушит изменения в репозиторий.
+Автоматически коммитит и пушит изменения в репозиторий (с предварительным pull --rebase).
 """
 
 import asyncio
@@ -37,7 +37,7 @@ TCP_PING_TIMEOUT = 1.5     # таймаут TCP-пинга (сек)
 SINGBOX_TIMEOUT = 7.0      # таймаут для реальной проверки (сек)
 MAX_CONCURRENT_PING = 100  # параллельных пингов
 MAX_CONCURRENT_SINGBOX = 50 # параллельных проверок sing-box
-MAX_SINGBOX_CHECKS = 500   # максимум конфигов, которые проверим через sing-box (чтобы не уйти в бесконечность)
+MAX_SINGBOX_CHECKS = 500   # максимум конфигов, которые проверим через sing-box
 
 # Ключевые слова для исключения (регистронезависимо)
 EXCLUDED_KEYWORDS = [
@@ -153,7 +153,6 @@ async def tcp_ping(host: str, port: int, timeout: float = TCP_PING_TIMEOUT) -> O
 
 # ======================== ГЕНЕРАТОР КОНФИГА SING-BOX ========================
 def generate_singbox_config(link: str) -> Optional[str]:
-    """Создаёт временный конфиг sing-box для прокси-ссылки, возвращает путь к файлу"""
     parsed = parse_proxy_url(link)
     if not parsed:
         return None
@@ -223,7 +222,6 @@ def generate_singbox_config(link: str) -> Optional[str]:
         }
         config["outbounds"].append(outbound)
     else:
-        # Другие протоколы не поддерживаются sing-box (vmess, ss, hysteria2)
         return None
 
     try:
@@ -235,7 +233,6 @@ def generate_singbox_config(link: str) -> Optional[str]:
 
 # ======================== РЕАЛЬНАЯ ПРОВЕРКА ЧЕРЕЗ SING-BOX ========================
 async def real_check(link: str, timeout: float = SINGBOX_TIMEOUT) -> Optional[float]:
-    """Проверяет конфиг через sing-box и реальный HTTP-запрос к google.com"""
     config_path = generate_singbox_config(link)
     if not config_path:
         return None
@@ -351,7 +348,6 @@ async def main():
     print(f"📊 Живых по TCP: {len(alive_ping)}")
 
     # ---- ЭТАП 2: реальная проверка через sing-box с динамическим добором до TOP_K ----
-    sem_singbox = asyncio.Semaphore(MAX_CONCURRENT_SINGBOX)
     working = []
     checked_count = 0
     candidates_to_check = alive_ping[:]
@@ -393,17 +389,14 @@ async def main():
 
     print("✅ Готово! Файл best_ping.txt обновлён.")
 
-    # ---- АВТОМАТИЧЕСКИЙ PUSH НА GITHUB (без ошибок) ----
+    # ---- АВТОМАТИЧЕСКИЙ PUSH НА GITHUB (с pull --rebase) ----
     try:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-        # 1. Подтягиваем изменения из удалённого репозитория
-        subprocess.run(["git", "pull", "origin", "main", "--no-rebase"], check=True, cwd=".")
-        # 2. Добавляем изменённый файл
+        # Критически важно: сначала подтягиваем удалённые изменения
+        subprocess.run(["git", "pull", "--rebase", "origin", "main"], check=True, cwd=".")
         subprocess.run(["git", "add", "best_ping.txt"], check=True, cwd=".")
-        # 3. Создаём коммит
         subprocess.run(["git", "commit", "-m", f"Auto-update {timestamp}"], check=True, cwd=".")
-        # 4. Пушим с безопасным флагом --force-with-lease (избегает конфликтов)
-        subprocess.run(["git", "push", "--force-with-lease", "origin", "main"], check=True, cwd=".")
+        subprocess.run(["git", "push", "origin", "main"], check=True, cwd=".")
         print("✅ Изменения отправлены на GitHub")
     except subprocess.CalledProcessError as e:
         print(f"⚠️ Ошибка git: {e}")
