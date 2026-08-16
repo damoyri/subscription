@@ -10,8 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # ← полная история, чтобы push в Bitbucket работал
 
       - name: Install dependencies
         run: |
@@ -20,14 +27,11 @@ jobs:
 
       - name: Install sing-box
         run: |
-          # Получаем информацию о последнем релизе
           RELEASE_JSON=$(curl -s -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/SagerNet/sing-box/releases/latest)
           
-          # Ищем asset: имя заканчивается на -linux-amd64.tar.gz, но не содержит glibc или musl
           DOWNLOAD_URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name | endswith("-linux-amd64.tar.gz") and (contains("glibc") or contains("musl") | not)) | .browser_download_url' | head -n1)
           
-          # Если не нашли, пробуем через версию напрямую (fallback)
           if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ]; then
             echo "Asset not found, trying fallback with version..."
             VERSION=$(echo "$RELEASE_JSON" | jq -r '.tag_name')
@@ -43,7 +47,6 @@ jobs:
           echo "Downloading from: $DOWNLOAD_URL"
           curl -L -H "Accept: application/octet-stream" -H "User-Agent: curl" -o sing-box.tar.gz "$DOWNLOAD_URL"
           
-          # Проверяем, что скачался реальный архив (размер > 1 МБ)
           if [ $(stat -c%s "sing-box.tar.gz") -lt 1000000 ]; then
             echo "Downloaded file too small, likely an error page"
             cat sing-box.tar.gz
@@ -81,16 +84,17 @@ jobs:
             exit 0
           fi
           
+          # Если по каким-то причинам репозиторий всё ещё shallow, делаем unshallow
+          git fetch --unshallow || true
+          
           mkdir -p ~/.ssh
           echo "$BITBUCKET_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
           
-          # Тихо проверяем, добавлен ли remote, чтобы не мусорить красными ошибками в лог
           if ! git remote get-url bitbucket > /dev/null 2>&1; then
             git remote add bitbucket git@bitbucket.org:damoyri/subscription.git
           fi
           
-          # Пушим с форсом (перезаписываем историю на Bitbucket)
           git push --force --all bitbucket
           git push --force --tags bitbucket
