@@ -4,10 +4,11 @@ build_config.py — сборщик VPN-конфигов для xray-core кли�
 Оптимизирован для РФ + мобильный интернет
 """
 from __future__ import annotations
-import asyncio, base64, json, os, re, ssl, sys, time, urllib.parse
+import asyncio, base64, json, os, re, ssl, sys, time, urllib.parse, ipaddress
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
+import copy
 
 # ===== КОНФИГУРАЦИЯ =====
 PAID_SUB_URL = os.environ.get("PAID_SUB_URL", "")
@@ -28,60 +29,44 @@ TCP_TIMEOUT = 3.0            # Пинг быстрее, мобилка же
 MAX_FOR_SINGBOX = 150        # Скока брать в шортлист
 MAX_SERVERS_PER_BALANCER = 100
 RETRY_ATTEMPTS = 3           # Повторные попытки загрузки
+PING_LIMIT = asyncio.Semaphore(300)  # Лимит одновременных коннектов
 
-# Fingerprints для TLS (чтоб DPI не палил)
 VALID_FINGERPRINTS = {"chrome", "firefox", "edge", "safari", "ios", "android", "qq", "random"}
 
-# Что выкидываем из белых списков (РФ/РБ серверы)
 EXCLUDE_PATTERN = re.compile(r"(Россия|anycast|Беларусь|🇷🇺|🇧🇾|Russia|Belarus)", re.IGNORECASE)
 
-# Маскировка секретов в логах
 _SECRET_PATTERN = re.compile(
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
     r"|(?<=://)[^@/\s]{10,}(?=@)"
 )
 
-# ===== РУ-СЕРВИСЫ НАПРЯМУЮ (чтоб не гнать через VPN) =====
+# ===== РУ-СЕРВИСЫ НАПРЯМУЮ =====
 RU_DIRECT_DOMAINS = [
-    # Яндекс экосистема
     "yandex.ru", "yandex.com", "ya.ru", "dzen.ru", "dzen.com",
     "maps.yandex.ru", "taxi.yandex.ru", "eda.yandex.ru",
     "market.yandex.ru", "music.yandex.ru", "weather.yandex.ru",
     "travel.yandex.ru", "kinopoisk.ru", "auto.ru", "realty.yandex.ru",
-    # Почта/соцсети
     "mail.ru", "vk.com", "vk.ru", "ok.ru", "rambler.ru",
-    # СМИ
     "rbc.ru", "rg.ru", "tass.ru", "lenta.ru",
-    # Стриминг
     "ivi.ru", "okko.tv", "kion.ru", "rutube.ru",
-    # Бизнес/софт
     "bitrix24.ru", "kontur.ru", "sbis.ru", "getcourse.ru",
     "habr.com", "habr.ru",
-    # Карты/авто
     "2gis.ru", "2gis.com", "drom.ru",
-    # Магазины
     "wildberries.ru", "wildberries.com", "ozon.ru", "avito.ru", "cian.ru",
-    # Госуслуги
     "gosuslugi.ru",
-    # Банки
     "vtb.ru", "alfabank.ru", "gazprombank.ru", "sberbank.ru", "tinkoff.ru",
-    # Образование
     "uchi.ru", "dnevnik.ru",
-    # Прочее важное
     "yoomoney.ru", "mvideo.ru", "eldorado.ru", "detmir.ru",
     "mos.ru", "nalog.ru",
 ]
-# Добавляем точки для сабдоменов (api.yandex.ru, static.vk.com и т.д.)
 RU_DOMAIN_SUFFIXES = [f".{d}" for d in RU_DIRECT_DOMAINS]
 
 
-# ===== ЛОГИРОВАНИЕ =====
 def mask_secret(t): return _SECRET_PATTERN.sub("<REDACTED>", t)
 def log(msg): print(mask_secret(msg), flush=True)
 def log_err(msg): print(mask_secret(msg), file=sys.stderr, flush=True)
 
 
-# ===== УТИЛИТЫ =====
 def clean_fingerprint(fp):
     if not fp: return "chrome"
     cleaned = re.sub(r"[#|*].*", "", fp).strip().lower()
@@ -97,10 +82,15 @@ def bracket_if_ipv6(addr):
     if ":" in addr and not addr.startswith("["): return f"[{addr}]"
     return addr
 
+def _is_ip(s: str) -> bool:
+    try:
+        ipaddress.ip_address(s)
+        return True
+    except ValueError:
+        return False
 
-# ===== СЕТЕВЫЕ ЗАПРОСЫ С RETRY =====
+
 async def fetch_url(url, timeout=15.0):
-    """Загружает URL с повторами при ошибке"""
     for attempt in range(RETRY_ATTEMPTS):
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -119,23 +109,21 @@ async def fetch_url(url, timeout=15.0):
             log_err(f"⚠️ fetch error for {url}: {e} (attempt {attempt+1})")
         
         if attempt < RETRY_ATTEMPTS - 1:
-            await asyncio.sleep(2 ** attempt)  # 1s, 2s, 4s...
+            await asyncio.sleep(2 ** attempt)
     
     return None
 
 
-# ===== ШАБЛОН КОНФИГА =====
 def create_config_template(remarks_text):
-    """Создаёт базовый шаблон xray-core конфига"""
     return {
         "log": {"loglevel": "warning"},
         "dns": {
             "servers": [
-                "https://common.dot.dns.yandex.net/dns-query",  # Яндекс - точно работает в РФ
-                "https://dns.adguard.com/dns-query",            # AdGuard - резерв
-                "https://1.1.1.1/dns-query",                    # Cloudflare - на всякий
+                "https://common.dot.dns.yandex.net/dns-query",
+                "https://dns.adguard.com/dns-query",
+                "https://1.1.1.1/dns-query",
             ],
-            "queryStrategy": "UseIPv4"  # На мобилке IPv6 часто отваливается
+            "queryStrategy": "UseIPv4"
         },
         "inbounds": [
             {
@@ -162,22 +150,17 @@ def create_config_template(remarks_text):
             "domainStrategy": "IPIfNonMatch",
             "domainMatcher": "hybrid",
             "rules": [
-                # Торренты мимо VPN (экономим трафик)
                 {"type": "field", "protocol": ["bittorrent"], "outboundTag": "direct"},
-                
-                # РУ-сервисы напрямую (точное совпадение доменов)
                 {
                     "type": "field",
                     "domain": RU_DIRECT_DOMAINS,
                     "outboundTag": "direct"
                 },
-                # РУ-сабдомены (*.yandex.ru, api.vk.com и т.д.)
                 {
                     "type": "field",
                     "domain": RU_DOMAIN_SUFFIXES,
                     "outboundTag": "direct"
                 },
-                # Всё остальное через балансировщик
                 {"type": "field", "network": "tcp,udp", "balancerTag": "WL_Balancer"}
             ],
             "balancers": [{
@@ -210,7 +193,6 @@ def create_config_template(remarks_text):
 
 
 def strip_balancer_for_empty(config):
-    """Убирает балансировщик когда серверов нет (фолбэк на direct)"""
     config["routing"]["rules"] = [
         {"type": "field", "protocol": ["bittorrent"], "outboundTag": "direct"},
         {"type": "field", "network": "tcp,udp", "outboundTag": "direct"}
@@ -225,8 +207,6 @@ def strip_balancer_for_empty(config):
 
 
 def create_single_outbound_config(outbound, remarks):
-    """Создаёт конфиг с одним сервером (для платных подписок)"""
-    import copy
     if not remarks:
         remarks = (
             outbound.get("remarks") or
@@ -249,7 +229,6 @@ def create_single_outbound_config(outbound, remarks):
     return config
 
 
-# ===== ПАРСЕРЫ ПРОТОКОЛОВ =====
 @dataclass
 class ParsedProxy:
     outbound: Dict[str, Any]
@@ -629,7 +608,6 @@ class VmessHandler(ProtocolHandler):
             return None
 
 
-# Реестр всех протоколов
 PROTOCOL_REGISTRY = [
     VlessHandler(),
     Hysteria2Handler(),
@@ -648,7 +626,6 @@ def parse_proxy_url(raw_url):
 
 
 async def get_links_from_urls(urls):
-    """Скачивает все ссылки и возвращает уникальные прокси-строки"""
     all_links = []
     schemes = tuple(h.scheme for h in PROTOCOL_REGISTRY)
     for url in urls:
@@ -659,73 +636,64 @@ async def get_links_from_urls(urls):
                 line = line.strip()
                 if line.startswith(schemes):
                     all_links.append(line)
-    return list(dict.fromkeys(all_links))  # Уникализация с сохранением порядка
+    return list(dict.fromkeys(all_links))
 
 
-# ===== ПРОВЕРКА РАБОТОСПОСОБНОСТИ =====
+# ===== ПРОВЕРКА ЖИВОСТИ СЕРВЕРОВ (ИСПРАВЛЕННАЯ) =====
 async def tcp_ping(host, port, timeout=TCP_TIMEOUT):
-    """Базовая проверка - открыт ли порт"""
-    start = time.monotonic()
-    try:
-        reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(host, port), 
-            timeout=timeout
-        )
-        writer.close()
-        try: 
-            await writer.wait_closed()
-        except: 
-            pass
-        return time.monotonic() - start
-    except Exception:
-        return None
+    """Базовая проверка — открыт ли порт"""
+    async with PING_LIMIT:
+        start = time.monotonic()
+        try:
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(host, port), timeout=timeout
+            )
+            writer.close()
+            try:
+                await asyncio.wait_for(writer.wait_closed(), timeout=1)
+            except Exception:
+                pass
+            return time.monotonic() - start
+        except Exception:
+            return None
 
 
 async def tls_ping(host, port, timeout=TCP_TIMEOUT):
-    """Проверяет TLS handshake - точнее чем просто TCP ping"""
-    start = time.monotonic()
-    try:
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE  # Нам не важен сертификат, главное что TLS живёт
-        
-        # Открываем TCP
-        reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(host, port),
-            timeout=timeout
-        )
-        
-        # Делаем TLS handshake
-        transport = writer.transport
-        await asyncio.wait_for(
-            asyncio.get_event_loop().start_tls(
-                transport, writer, ctx, 
-                server_hostname=host
-            ),
-            timeout=timeout
-        )
-        
-        writer.close()
+    """Правильный TLS handshake через open_connection"""
+    async with PING_LIMIT:
+        start = time.monotonic()
         try:
-            await writer.wait_closed()
-        except:
-            pass
-        
-        return time.monotonic() - start
-    except Exception:
-        return None
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+
+            # Если адрес — IP, то SNI шлём пустой, иначе ssl кинет ValueError
+            sni = "" if _is_ip(host) else host
+
+            # Handshake происходит внутри open_connection —
+            # wait_for гарантирует таймаут, никаких висящих future
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(host, port, ssl=ctx, server_hostname=sni),
+                timeout=timeout
+            )
+            writer.close()
+            try:
+                await asyncio.wait_for(writer.wait_closed(), timeout=1)
+            except Exception:
+                pass
+            return time.monotonic() - start
+        except Exception:
+            return None
 
 
 async def check_server(p: ParsedProxy):
-    """Выбирает правильный метод проверки в зависимости от протокола"""
+    """Выбирает метод проверки по протоколу"""
     protocol = p.outbound.get("protocol", "")
     if protocol in ["vless", "vmess", "trojan"]:
         return await tls_ping(p.address, p.port)
-    else:
-        return await tcp_ping(p.address, p.port)
+    return await tcp_ping(p.address, p.port)
 
 
-# ===== ГЛАВНАЯ ФУНКЦИЯ ПРОВЕРКИ И БАЛАНСИРОВКИ =====
 @dataclass
 class Candidate:
     outbound: Dict[str, Any]
@@ -733,7 +701,7 @@ class Candidate:
     address: str
     port: int
     rtt: float = field(default=0.0)
-    source: str = field(default="")  # Откуда пришёл сервер
+    source: str = field(default="")
 
 
 async def check_and_create_balancer(
@@ -747,7 +715,6 @@ async def check_and_create_balancer(
 ):
     log(f"\n🔍 Checking source: {source_name} (total {len(parsed_candidates)})")
     
-    import copy
     fail_config = strip_balancer_for_empty(create_config_template(remarks_fail))
     
     if not parsed_candidates:
@@ -768,17 +735,12 @@ async def check_and_create_balancer(
     if not alive:
         return fail_config, []
     
-    # Сортируем по пингу
     alive.sort(key=lambda c: c.rtt)
-    
-    # Берём топ MAX_FOR_SINGBOX для дальнейшей обработки
     shortlist = alive[:MAX_FOR_SINGBOX]
     best = shortlist[:max_servers]
     used_addrs = {(c.address, c.port) for c in best}
     
-    # Если не хватает - добираем из резерва
     if len(best) < max_servers and reserve_candidates:
-        needed = max_servers - len(best)
         sorted_reserve = sorted(reserve_candidates, key=lambda c: c.rtt)
         added_from_reserve = 0
         
@@ -790,7 +752,6 @@ async def check_and_create_balancer(
             if reserve_filter is not None and not reserve_filter(c): 
                 continue
             
-            # Помечаем что это резервный сервер
             reserve_cand = Candidate(
                 c.outbound, c.remarks, c.address, c.port, c.rtt,
                 source=f"{source_name}-RESERVE"
@@ -802,7 +763,6 @@ async def check_and_create_balancer(
         if added_from_reserve > 0:
             log(f"   ➕ Added from reserve: {added_from_reserve}")
     
-    # Статистика откуда что пришло
     source_count = {}
     for c in best:
         source_count[c.source] = source_count.get(c.source, 0) + 1
@@ -811,10 +771,8 @@ async def check_and_create_balancer(
     
     log(f"   🏆 Final: {len(best)}")
     
-    # Создаём outbounds и теги
     outbounds, tags = [], []
     for idx, cand in enumerate(best, start=1):
-        # Тег включает источник если это резерв
         if "RESERVE" in cand.source:
             tag = f"{cand.source}-{idx}"
         else:
@@ -825,7 +783,6 @@ async def check_and_create_balancer(
         outbounds.append(ob_copy)
         tags.append(tag)
     
-    # Собираем финальный конфиг
     config = create_config_template(
         remarks_ok_template.format(name=source_name, count=len(best))
     )
@@ -839,7 +796,6 @@ async def check_and_create_balancer(
     return config, alive
 
 
-# ===== ЗАГРУЗКА ПЛАТНОЙ ПОДПИСКИ =====
 def _extract_server_from_dict(item):
     address = item.get("server") or item.get("address") or item.get("host")
     port = item.get("port") or item.get("port_number")
@@ -872,14 +828,12 @@ async def load_paid_subscription() -> List[Dict[str, Any]]:
     
     raw = await fetch_url(PAID_SUB_URL)
     
-    # Фолбэк на кэш если не удалось скачать
     if not raw:
         log("⚠️ Не удалось загрузить подписку, восстанавливаем из subscription.json...")
         try:
             with open("subscription.json", "r", encoding="utf-8") as f:
                 old = json.load(f)
             if isinstance(old, list):
-                # Берём только платные конфиги (без маркеров бесплатных)
                 paid_only = [c for c in old if not any(
                     marker in c.get("remarks", "") 
                     for marker in ("🏳️", "🏴", "📦")
@@ -956,7 +910,6 @@ async def load_paid_subscription() -> List[Dict[str, Any]]:
             log_err("⚠️ Неожиданный тип JSON")
             
     except json.JSONDecodeError:
-        # Не JSON - пробуем Base64 или plain text
         try:
             decoded = base64.b64decode(raw).decode("utf-8")
         except Exception:
@@ -983,12 +936,10 @@ async def load_paid_subscription() -> List[Dict[str, Any]]:
     return []
 
 
-# ===== MAIN =====
 async def main_async():
     paid_configs = await load_paid_subscription()
     log(f"Итого платных конфигов: {len(paid_configs)}\n")
 
-    # Качаем все списки параллельно
     white_links, black_links, extra_links = await asyncio.gather(
         get_links_from_urls(WHITE_URLS),
         get_links_from_urls(BLACK_URLS),
@@ -1000,7 +951,6 @@ async def main_async():
         out = []
         for link in links:
             p = parse_proxy_url(link)
-            # Hysteria2 исключаем - многие клиенты её не тянут
             if p is not None and p.outbound.get("protocol") != "hysteria2":
                 out.append(p)
         return out
@@ -1009,17 +959,14 @@ async def main_async():
     black_parsed = parse_all(black_links)
     extra_parsed = parse_all(extra_links)
     
-    # Из белых выкидываем РФ/РБ
     white_without_ru = [p for p in white_parsed if not is_excluded_region(p.remarks)]
 
-    # СНАЧАЛА проверяем EXTRA (он будет резервом для остальных)
     config_extra, alive_extra = await check_and_create_balancer(
         extra_parsed, "EXTRA", MAX_SERVERS_PER_BALANCER,
         remarks_ok_template="📦 EXTRA ✅ {count}",
         remarks_fail="📦 EXTRA ⛔ Временно не работает",
     )
     
-    # WL-noRU с резервом из EXTRA
     config_white_noru, _ = await check_and_create_balancer(
         white_without_ru, "WL-noRU", MAX_SERVERS_PER_BALANCER,
         remarks_ok_template="🏳️ WL-noRU ✅ {count}",
@@ -1028,17 +975,14 @@ async def main_async():
         reserve_filter=lambda c: not is_excluded_region(c.remarks)
     )
     
-    # BL без резерва
     config_black, _ = await check_and_create_balancer(
         black_parsed, "BL", MAX_SERVERS_PER_BALANCER,
         remarks_ok_template="🏴 BL ✅ {count}",
         remarks_fail="🏴 BL ⛔ Временно не работает",
     )
 
-    # Склеиваем всё вместе
     final_configs = [config_white_noru, config_black, config_extra] + paid_configs
 
-    # Сохраняем
     with open("subscription.json", "w", encoding="utf-8") as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
 
