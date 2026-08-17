@@ -28,7 +28,7 @@ EXTRA_URLS = [
 TCP_TIMEOUT = 3.0            # Таймаут одного пинга
 MAX_FOR_SINGBOX = 150        # Шортлист
 MAX_SERVERS_PER_BALANCER = 100
-MAX_PING_PER_SOURCE = 3000   # Максимум сколько пингуем с одного списка
+MAX_PING_PER_SOURCE = 10000   # Максимум сколько пингуем с одного списка
 RETRY_ATTEMPTS = 3           # Повторные попытки загрузки
 PING_BATCH = 300             # Сколько серверов пингуем одновременно
 
