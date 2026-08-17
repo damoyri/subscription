@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """
 build_config.py — финальный сборщик VPN-конфигов для xray-core клиентов.
-Сборки: 🏳️LTE-1 (РУ-SNI, white+extra), 🏳️LTE-2(no-ru), 🏳️LTE-3 (extra), 🏴Wi-Fi-1 (black).
-Чёрный список НЕ участвует в LTE-сборках — он только для вайфая.
+Сборки:
+• 🏳️LTE-1 — ПОСЛЕДНИЙ ШАНС на мобилке: igareck с РУ-SNI (любые регионы,
+  включая РФ/РБ — оператор пропускает по белому SNI), без пинга, добор из LTE-3.
+• 🏳️LTE-2(no-ru) — для мобильного: РУ-SNI + НЕ РФ/РБ по remarks
+  (минимизируем подключение к России/Беларуси, где блочат), без пинга, добор из LTE-3.
+• 🏳️LTE-3 — extra (goida 26), с пингом и второй попыткой.
+• 🏴Wi-Fi-1 — чёрные списки, с пингом, только для вайфая.
 Платные конфиги не сортируются — как пришли, так и лежат.
 """
 from __future__ import annotations
@@ -32,7 +37,7 @@ PING_BATCH = 300
 RETRY_ATTEMPTS = 3
 
 MAX_LTE1 = 100    # 🏳️LTE-1
-MAX_LTE2 = 100    # 🏳️LTE-2(no-ru) — как в старых рабочих версиях (80-150)
+MAX_LTE2 = 100    # 🏳️LTE-2(no-ru)
 MAX_LTE3 = 100    # 🏳️LTE-3
 MAX_WIFI = 100    # 🏴Wi-Fi-1
 
@@ -43,7 +48,7 @@ VALID_FINGERPRINTS = {"chrome", "firefox", "edge", "safari", "ios", "android", "
 SUPPORTED_NETWORKS = {"tcp", "raw", "ws", "websocket", "grpc", "gun", "httpupgrade"}
 NETWORK_NORMALIZE = {"raw": "tcp", "websocket": "ws", "gun": "grpc"}
 
-EXCLUDE_PATTERN = re.compile(r"(Россия|anycast|Беларусь|🇷|🇧🇾|Russia|Belarus)", re.IGNORECASE)
+EXCLUDE_PATTERN = re.compile(r"(Россия|anycast|Беларусь|🇷🇺|🇧🇾|Russia|Belarus)", re.IGNORECASE)
 
 _SECRET_PATTERN = re.compile(
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
@@ -679,13 +684,17 @@ async def ping_candidates(parsed_candidates):
 
     dead = [uniq[k] for k, rtt in rtt_map.items() if rtt is None]
     if dead:
-        log(f"   🔄 Retry: {len(dead)} не ответили, второй шанс")
+        log(f"   🔄 Retry: {len(dead)} не ответили, даю второй шанс")
+        revived = 0
         for i in range(0, len(dead), PING_BATCH):
             batch = dead[i:i + PING_BATCH]
             results = await asyncio.gather(*(check_server(p) for p in batch))
             for p, rtt in zip(batch, results):
                 if rtt is not None:
                     rtt_map[(p.address, p.port)] = rtt
+                    revived += 1
+            log(f"   🔄 Retry progress: {min(i + PING_BATCH, len(dead))}/{len(dead)}")
+        log(f"   ✅ Со второй попытки ожило: {revived}")
     return rtt_map
 
 
@@ -748,7 +757,6 @@ async def check_and_create_balancer(
 
     outbounds, tags = [], []
     for idx, cand in enumerate(best, start=1):
-        # Теги как договорились: LTE-1-3, LTE-2-14, резервные — LTE-3-1 и т.д.
         tag = f"{cand.source}-{idx}"
         ob_copy = copy.deepcopy(cand.outbound)
         ob_copy["tag"] = tag
@@ -879,19 +887,18 @@ async def main_async():
     white_parsed = parse_all(white_links)
     black_parsed = parse_all(black_links)
     extra_parsed = parse_all(extra_links)
-    white_without_ru = [p for p in white_parsed if not is_excluded_region(p.remarks)]
 
-    # 🏳️LTE-3 (EXTRA) — первым, его живые пойдут в резерв для LTE-2
+    # 🏳️LTE-3 (EXTRA) — первым, его живые пойдут в резерв для LTE-1 и LTE-2
     config_lte3, alive_lte3 = await check_and_create_balancer(
         extra_parsed, "LTE-3", MAX_LTE3,
         remarks_ok_template="🏳️LTE-3 ✅ {count}",
         remarks_fail="🏳️LTE-3 ⛔ Временно не работает",
     )
 
-    # 🏳️LTE-1: база — ТОЛЬКО igareck с РУ-SNI.
-    # Если igareck не набрал MAX_LTE1 — добираем из живых LTE-3 (тоже только РУ-SNI)
+    # 🏳️LTE-1: ПОСЛЕДНИЙ ШАНС. Все igareck с РУ-SNI, ЛЮБЫЕ регионы (включая РФ/РБ —
+    # оператор пропускает по белому SNI). Без пинга, добор РУ-SNI из живых LTE-3.
     lte1_parsed = [p for p in white_parsed if is_lte_compatible(p)]
-    log(f"📱 LTE-совместимых у igareck (РУ SNI): {len(lte1_parsed)}")
+    log(f"📱 LTE-1: igareck с РУ-SNI (все регионы): {len(lte1_parsed)}")
     config_lte1, _ = await check_and_create_balancer(
         lte1_parsed, "LTE-1", MAX_LTE1,
         remarks_ok_template="🏳️LTE-1 ✅ {count}",
@@ -901,14 +908,17 @@ async def main_async():
         use_ping=False,
     )
 
-    # 🏳️LTE-2(no-ru): белые без РФ/РБ, без пинга (как старые рабочие),
-    # добор из живых LTE-3 — резервные получат теги LTE-3-x
+    # 🏳️LTE-2(no-ru): РУ-SNI + НЕ РФ/РБ по remarks (минимизируем подключение
+    # к России/Беларуси, где блочат). Без пинга, добор из LTE-3 с теми же фильтрами.
+    lte2_parsed = [p for p in white_parsed
+                   if is_lte_compatible(p) and not is_excluded_region(p.remarks)]
+    log(f"📱 LTE-2: igareck с РУ-SNI и НЕ РФ/РБ: {len(lte2_parsed)}")
     config_lte2, _ = await check_and_create_balancer(
-        white_without_ru, "LTE-2", MAX_LTE2,
+        lte2_parsed, "LTE-2", MAX_LTE2,
         remarks_ok_template="🏳️LTE-2(no-ru) ✅ {count}",
         remarks_fail="🏳️LTE-2(no-ru) ⛔ Временно не работает",
         reserve_candidates=alive_lte3,
-        reserve_filter=lambda c: not is_excluded_region(c.remarks),
+        reserve_filter=lambda c: is_lte_compatible(c) and not is_excluded_region(c.remarks),
         use_ping=False,
     )
 
