@@ -888,9 +888,12 @@ async def main_async():
     black_parsed = parse_all(black_links)
     extra_parsed = parse_all(extra_links)
 
-    # 🏳️LTE-3 (EXTRA) — первым, его живые пойдут в резерв для LTE-1 и LTE-2
+    # 🏳️LTE-3: extra, но ТОЛЬКО с РУ-SNI (иначе оператор не пропустит на LTE),
+    # с пингом. Его живые пойдут в резерв для LTE-1/LTE-2
+    lte3_parsed = [p for p in extra_parsed if is_lte_compatible(p)]
+    log(f"📱 LTE-3: extra с РУ-SNI: {len(lte3_parsed)}")
     config_lte3, alive_lte3 = await check_and_create_balancer(
-        extra_parsed, "LTE-3", MAX_LTE3,
+        lte3_parsed, "LTE-3", MAX_LTE3,
         remarks_ok_template="🏳️LTE-3 ✅ {count}",
         remarks_fail="🏳️LTE-3 ⛔ Временно не работает",
     )
