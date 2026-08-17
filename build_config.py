@@ -78,8 +78,44 @@ RU_DOMAIN_SUFFIXES = [f".{d}" for d in RU_DIRECT_DOMAINS]
 
 # ===== SNI, которые оператор пропускает на LTE (как у платных ОБХОД LTE) =====
 LTE_SNI_WHITELIST = (
-    "vk.com", "yandex.ru", "ya.ru", "x5.ru", "yandexcloud.net",
-    "max.ru", "rutube.ru", "ozon.ru", "gosuslugi.ru", "mail.ru",
+    # Мессенджеры / соцсети / почта
+    "vk.com", "vk.ru", "vk-portal.net", "userapi.com", "ok.ru", "okcdn.ru",
+    "mail.ru", "rambler.ru", "max.ru", "oneme.ru", "tamtam.ru",
+    "mradx.net",  # mail.ru CDN
+    
+    # Яндекс экосистема
+    "yandex.ru", "yandex.com", "yandex.net", "ya.ru",
+    "dzen.ru", "kinopoisk.ru", "rutube.ru", "yastatic.net",
+    "yandexcloud.net", "yastatic.net",
+    
+    # Маркетплейсы / ритейл
+    "ozon.ru", "ozone.ru", "wildberries.ru", "wb.ru",
+    "avito.ru", "avito.st",
+    "x5.ru", "ads.x5.ru", "lk.x5.ru",
+    "lemanapro.ru",  # Леруа Мерлен
+    
+    # Банки / финансы (осторожно, не все работают напрямую)
+    "alfabank.ru", "sberbank.ru", "vtb.ru", "tbank.ru",
+    "tinkoff.ru", "cdn-tinkoff.ru",
+    "yoomoney.ru",
+    
+    # Госуслуги / госсайты
+    "gosuslugi.ru", "digital.gov.ru", "government.ru",
+    "kremlin.ru", "duma.gov.ru", "cikrf.ru", "izbirkom.ru",
+    "mos.ru", "mosreg.ru", "nalog.ru", "gu-st.ru",
+    "roskachestvo.gov.ru", "onf.ru",
+    
+    # Транспорт / сервисы
+    "rzd.ru", "pochta.ru", "taximaxim.ru", "tutu.ru",
+    "2gis.ru", "2gis.com",
+    "evotor.ru", "ofd.ru", "lizaalert.org",
+    
+    # Медиа
+    "t2.ru",  # Теле2
+    "gazeta.ru", "lenta.ru", "kp.ru", "rbc.ru",
+    
+    # Прочее полезное
+    "dobro.ru", "hrlink.ru", "sochisirius.ru", "sirius.online",
     "mediavitrina.ru", "trbcdn.net", "ngenix.net",
 )
 
