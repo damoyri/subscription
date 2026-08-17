@@ -283,6 +283,10 @@ class VlessHandler(ProtocolHandler):
             fingerprint = clean_fingerprint(params.get("fp") or params.get("fingerprint"))
             is_reality = ("pbk" in params) or ("publicKey" in params) or (params.get("security") == "reality")
             if is_reality and not (params.get("pbk") or params.get("publicKey")): return None
+            # REALITY в xray-core живёт ТОЛЬКО на tcp/grpc/xhttp —
+            # reality+ws/httpupgrade убивает весь конфиг при парсе
+            if is_reality and network not in ("tcp", "grpc"):
+                return None
 
             stream: Dict[str, Any] = {"network": network,
                                       "security": "reality" if is_reality else "tls"}
