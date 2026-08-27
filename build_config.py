@@ -13,8 +13,8 @@ build_config.py — финальный сборщик VPN-конфигов дл�
 from __future__ import annotations
 import asyncio, base64, json, os, re, ssl, sys, time, urllib.parse, ipaddress
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 import copy
 
 # ===== КОНФИГУРАЦИЯ =====
@@ -35,6 +35,7 @@ EXTRA_URLS = [
 TCP_TIMEOUT = 7.0
 PING_BATCH = 300
 RETRY_ATTEMPTS = 3
+SCRIPT_TIMEOUT = 20 * 60  # жёсткий потолок на весь скрипт, чтобы cron-джоба не зависла навечно
 
 MAX_LTE1 = 100    # 🏳️LTE-1
 MAX_LTE2 = 100    # 🏳️LTE-2(no-ru)
@@ -75,6 +76,14 @@ RU_DIRECT_DOMAINS = [
     "mos.ru", "nalog.ru",
 ]
 RU_DOMAIN_SUFFIXES = [f".{d}" for d in RU_DIRECT_DOMAINS]
+
+# ===== Wi-Fi-1: ВСЯ зона .ru — напрямую, минуя VPN =====
+# regexp вместо geosite/domain:suffix — не требует ассетов (geosite.dat) на клиенте
+# и работает одинаково во всех сборках xray-core (GUI-клиенты на телефонах часто
+# не подтягивают geosite/geoip автоматически).
+WIFI_EXTRA_RULES = [
+    {"type": "field", "domain": ["regexp:\\.ru$"], "outboundTag": "direct"},
+]
 
 # ===== SNI, которые оператор пропускает на LTE (как у платных ОБХОД LTE) =====
 LTE_SNI_WHITELIST = (
@@ -180,8 +189,21 @@ async def fetch_url(url, timeout=15.0):
     return None
 
 
-def create_config_template(remarks_text):
-    """Шаблон как в старых РАБОЧИХ версиях + expected 4 как у платных."""
+def create_config_template(remarks_text, extra_rules=None):
+    """Шаблон как в старых РАБОЧИХ версиях + expected 4 как у платных.
+
+    extra_rules: доп. правила routing.rules, вставляются ПЕРЕД catch-all
+    правилом на балансировщик (например, WIFI_EXTRA_RULES для Wi-Fi-1).
+    """
+    rules = [
+        {"type": "field", "protocol": ["bittorrent"], "outboundTag": "direct"},
+        {"type": "field", "domain": RU_DIRECT_DOMAINS, "outboundTag": "direct"},
+        {"type": "field", "domain": RU_DOMAIN_SUFFIXES, "outboundTag": "direct"},
+    ]
+    if extra_rules:
+        rules.extend(extra_rules)
+    rules.append({"type": "field", "network": "tcp,udp", "balancerTag": "WL_Balancer"})
+
     return {
         "log": {"loglevel": "warning"},
         "dns": {
@@ -204,12 +226,7 @@ def create_config_template(remarks_text):
         "routing": {
             "domainStrategy": "IPIfNonMatch",
             "domainMatcher": "hybrid",
-            "rules": [
-                {"type": "field", "protocol": ["bittorrent"], "outboundTag": "direct"},
-                {"type": "field", "domain": RU_DIRECT_DOMAINS, "outboundTag": "direct"},
-                {"type": "field", "domain": RU_DOMAIN_SUFFIXES, "outboundTag": "direct"},
-                {"type": "field", "network": "tcp,udp", "balancerTag": "WL_Balancer"}
-            ],
+            "rules": rules,
             "balancers": [{
                 "tag": "WL_Balancer",
                 "selector": [],
@@ -415,52 +432,6 @@ class VlessHandler(ProtocolHandler):
             return None
 
 
-class Hysteria2Handler(ProtocolHandler):
-    scheme = "hysteria2://"
-
-    def parse(self, raw_url):
-        url_str, remarks = self.split_remarks(raw_url)
-        if not url_str.startswith(self.scheme): return None
-        try:
-            parsed = urllib.parse.urlparse(url_str)
-            auth, address_raw, port = parsed.username, parsed.hostname, parsed.port or 443
-            if not auth or not address_raw: return None
-            address = normalize_address(address_raw)
-            params = urllib.parse.parse_qs(parsed.query)
-            alpn = params.get("alpn", [None])[0]
-            outbound = {
-                "tag": None, "protocol": "hysteria2",
-                "settings": {"servers": [{
-                    "address": address, "port": port, "auth": auth,
-                    "sni": params.get("sni", [address])[0],
-                    "fingerprint": params.get("fingerprint", ["chrome"])[0],
-                    "insecure": params.get("insecure", ["0"])[0] == "1",
-                    "alpn": alpn.split(",") if alpn else [],
-                }]},
-            }
-            outbound["remarks"] = remarks
-            return ParsedProxy(outbound, remarks, address, port)
-        except Exception:
-            return None
-
-    def generate(self, outbound, remarks):
-        try:
-            s = outbound["settings"]["servers"][0]
-            address, port, auth = s.get("address"), s.get("port"), s.get("auth")
-            if not (address and port and auth): return None
-            params = {}
-            if s.get("sni"): params["sni"] = s["sni"]
-            if s.get("fingerprint"): params["fingerprint"] = s["fingerprint"]
-            if s.get("insecure"): params["insecure"] = "1"
-            if s.get("alpn"): params["alpn"] = ",".join(s["alpn"])
-            url = f"hysteria2://{auth}@{bracket_if_ipv6(address)}:{port}"
-            if params: url += "?" + "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items())
-            if remarks: url += "#" + urllib.parse.quote(remarks)
-            return url
-        except Exception:
-            return None
-
-
 class TrojanHandler(ProtocolHandler):
     scheme = "trojan://"
 
@@ -643,7 +614,7 @@ class VmessHandler(ProtocolHandler):
 
 
 PROTOCOL_REGISTRY = [
-    VlessHandler(), Hysteria2Handler(), TrojanHandler(), ShadowsocksHandler(), VmessHandler(),
+    VlessHandler(), TrojanHandler(), ShadowsocksHandler(), VmessHandler(),
 ]
 
 
@@ -752,10 +723,10 @@ async def check_and_create_balancer(
     parsed_candidates, source_name, max_servers,
     remarks_ok_template, remarks_fail,
     reserve_candidates=None, reserve_filter=None,
-    use_ping=True,
+    use_ping=True, extra_routing_rules=None,
 ):
     log(f"\n🔍 Checking source: {source_name} (total {len(parsed_candidates)})")
-    fail_config = strip_balancer_for_empty(create_config_template(remarks_fail))
+    fail_config = strip_balancer_for_empty(create_config_template(remarks_fail, extra_routing_rules))
     if not parsed_candidates:
         return fail_config, []
 
@@ -766,7 +737,7 @@ async def check_and_create_balancer(
                  for p in parsed_candidates if rtt_map.get((p.address, p.port)) is not None]
     else:
         # Как в старых рабочих версиях: без пинга, клиент сам выберет с телефона
-        log(f"   ⏭️ Без пинга — проверку оставлю балансировщику клиента")
+        log("   ⏭️ Без пинга — проверку оставлю балансировщику клиента")
         alive = [Candidate(p.outbound, p.remarks, p.address, p.port, 0.0, source_name)
                  for p in parsed_candidates]
 
@@ -803,7 +774,7 @@ async def check_and_create_balancer(
         outbounds.append(ob_copy)
         tags.append(tag)
 
-    config = create_config_template(remarks_ok_template.format(count=len(best)))
+    config = create_config_template(remarks_ok_template.format(count=len(best)), extra_routing_rules)
     config["outbounds"] = outbounds + [
         {"protocol": "freedom", "settings": {"domainStrategy": "UseIPv4"}, "tag": "direct"},
         {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"},
@@ -916,13 +887,10 @@ async def main_async():
     log(f"Найдено ссылок: белые={len(white_links)}, чёрные={len(black_links)}, extra={len(extra_links)}")
 
     def parse_all(links):
-        out = []
-        for link in links:
-            p = parse_proxy_url(link)
-            # hysteria2 не поддерживается xray-core — выкидываем
-            if p is not None and p.outbound.get("protocol") != "hysteria2":
-                out.append(p)
-        return out
+        # hysteria2 и прочие неподдерживаемые xray-core схемы отсеиваются
+        # автоматически: для них просто нет обработчика в PROTOCOL_REGISTRY,
+        # и parse_proxy_url вернёт None.
+        return [p for link in links if (p := parse_proxy_url(link)) is not None]
 
     white_parsed = parse_all(white_links)
     black_parsed = parse_all(black_links)
@@ -965,18 +933,19 @@ async def main_async():
         use_ping=False,
     )
 
-    # 🏴Wi-Fi-1: чёрный список, только для вайфая, с пингом
+    # 🏴Wi-Fi-1: чёрный список, только для вайфая, с пингом.
+    # Плюс: вся зона .ru уходит напрямую, минуя VPN (WIFI_EXTRA_RULES).
     config_wifi1, _ = await check_and_create_balancer(
         black_parsed, "Wi-Fi-1", MAX_WIFI,
         remarks_ok_template="🏴Wi-Fi-1 ✅ {count}",
         remarks_fail="🏴Wi-Fi-1 ⛔ Временно не работает",
+        extra_routing_rules=WIFI_EXTRA_RULES,
     )
 
     final_configs = [config_lte1, config_lte2, config_lte3, config_wifi1] + paid_configs
 
+    # Запись только в subscription.json (subscription.txt удалён)
     with open("subscription.json", "w", encoding="utf-8") as f:
-        json.dump(final_configs, f, indent=2, ensure_ascii=False)
-    with open("subscription.txt", "w", encoding="utf-8") as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
 
     def selector_len(cfg):
@@ -993,7 +962,10 @@ async def main_async():
 
 def main():
     try:
-        asyncio.run(main_async())
+        asyncio.run(asyncio.wait_for(main_async(), timeout=SCRIPT_TIMEOUT))
+    except asyncio.TimeoutError:
+        log_err(f"❌ Скрипт превысил лимит {SCRIPT_TIMEOUT}s и был остановлен")
+        sys.exit(1)
     except Exception as e:
         log_err(f"❌ Критическая ошибка: {mask_secret(str(e))}")
         import traceback
