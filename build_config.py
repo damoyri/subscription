@@ -30,7 +30,7 @@ PING_BATCH = 300
 RETRY_ATTEMPTS = 3
 SCRIPT_TIMEOUT = 20 * 60
 CHUNK_SIZE = 100           # Сколько серверов в одном конфиге
-MAX_PING_CANDIDATES = 2000 # Ограничиваем число проверяемых, чтобы не тянуть долго
+MAX_PING_CANDIDATES = 20000 # Ограничиваем число проверяемых, чтобы не тянуть долго
 
 OMS_TZ = timezone(timedelta(hours=6))
 
@@ -602,7 +602,6 @@ async def check_server(p: ParsedProxy):
     return await tcp_ping(p.address, p.port)
 
 async def ping_candidates(parsed_candidates, limit=MAX_PING_CANDIDATES):
-    # Ограничиваем число уникальных адресов для пинга
     uniq: Dict[Tuple[str, int], ParsedProxy] = {}
     for p in parsed_candidates:
         uniq.setdefault((p.address, p.port), p)
@@ -644,10 +643,8 @@ class Candidate:
     source: str = ""
 
 def generate_chunked_configs(candidates, base_name, emoji, omsk_time, extra_rules=None):
-    """Разбивает список кандидатов на чанки и создаёт конфиги."""
     if not candidates:
         return []
-    # Сортируем по rtt (белые с 0.0 будут первыми)
     candidates = sorted(candidates, key=lambda c: c.rtt)
     chunks = [candidates[i:i + CHUNK_SIZE] for i in range(0, len(candidates), CHUNK_SIZE)]
     safe_base = re.sub(r'[^a-zA-Z0-9]', '', base_name).lower() or "config"
@@ -840,15 +837,9 @@ async def main_async():
     
     final_configs = lte_configs + lte_no_ru_configs + wifi_configs + paid_configs
     
-    # Обёртка
-    subscription_wrapper = {
-        "version": 1,
-        "remarks": f"🚀 My VPN Subscription | Обновлено: {omsk_time} (Омск)",
-        "servers": final_configs
-    }
-    
+    # ============= ИЗМЕНЕНИЕ: пишем ПРЯМО список, без обёртки =============
     with open("subscription.json", "w", encoding="utf-8") as f:
-        json.dump(subscription_wrapper, f, indent=2, ensure_ascii=False)
+        json.dump(final_configs, f, indent=2, ensure_ascii=False)
     
     log("\n✅ Успешно обновлено!")
     log(f"   • 🏳️ LTE (все регионы): {len(lte_configs)} конфигов")
