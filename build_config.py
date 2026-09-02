@@ -38,7 +38,7 @@ RETRY_ATTEMPTS = 3
 SCRIPT_TIMEOUT = 20 * 60  # жёсткий потолок на весь скрипт, чтобы cron-джоба не зависла навечно
 
 MAX_LTE1 = 100    # 🏳️LTE-1
-MAX_LTE2 = 100    # 🏳️LTE-2(no-ru)
+MAX_LTE2 = 150    # 🏳️LTE-2(no-ru)
 MAX_LTE3 = 100    # 🏳️LTE-3
 MAX_WIFI = 100    # 🏴Wi-Fi-1
 
