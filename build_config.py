@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 import copy
+from datetime import datetime, timedelta, timezone
 
 # ===== КОНФИГУРАЦИЯ =====
 PAID_SUB_URL = os.environ.get("PAID_SUB_URL", "")
@@ -43,7 +44,8 @@ MAX_LTE2 = 150    # 🏳️LTE-2(no-ru)
 MAX_LTE3 = 100    # 🏳️LTE-3
 MAX_WIFI = 100    # 🏴Wi-Fi-1
 
-CHUNK_SIZE = 100   # Сколько серверов в одном дополнительном конфиге
+CHUNK_SIZE = 100            # Сколько серверов в одном дополнительном конфиге
+MAX_PING_CANDIDATES = 20000 # Ограничиваем число проверяемых, чтобы не тянуть долго
 
 VALID_FINGERPRINTS = {"chrome", "firefox", "edge", "safari", "ios", "android", "qq", "random"}
 
@@ -58,6 +60,12 @@ _SECRET_PATTERN = re.compile(
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
     r"|(?<=://)[^@/\s]{10,}(?=@)"
 )
+
+# ===== Часовой пояс Омск (MSK+3) =====
+OMS_TZ = timezone(timedelta(hours=6))
+
+def get_omsk_time_str():
+    return datetime.now(OMS_TZ).strftime("%d.%m %H:%M")
 
 # ===== РУ-СЕРВИСЫ НАПРЯМУЮ (ОБНОВЛЁННЫЙ СПИСОК) =====
 RU_DIRECT_DOMAINS = [
@@ -284,10 +292,11 @@ def strip_balancer_for_empty(config):
     return config
 
 
-def create_single_outbound_config(outbound, remarks):
+def create_single_outbound_config(outbound, remarks, omsk_time):
     if not remarks:
         remarks = (outbound.get("remarks") or outbound.get("serverName")
                    or outbound.get("address") or outbound.get("server") or "Платная подписка")
+    remarks = f"{remarks} | ⏱ {omsk_time}"
     config = create_config_template(remarks)
     ob_copy = copy.deepcopy(outbound)
     ob_copy["tag"] = "paid-1"
@@ -691,11 +700,16 @@ async def check_server(p: ParsedProxy):
 
 
 async def ping_candidates(parsed_candidates):
-    """Уникальные (address,port), батчами, с прогрессом и второй попыткой."""
+    """Уникальные (address,port), батчами, с прогрессом и второй попыткой.
+       Ограничиваем число проверяемых MAX_PING_CANDIDATES, чтобы не тянуть долго.
+    """
     uniq: Dict[Tuple[str, int], ParsedProxy] = {}
     for p in parsed_candidates:
         uniq.setdefault((p.address, p.port), p)
     items = list(uniq.values())
+    if len(items) > MAX_PING_CANDIDATES:
+        log(f"   ⚠️ Слишком много ({len(items)}), беру первые {MAX_PING_CANDIDATES}")
+        items = items[:MAX_PING_CANDIDATES]
     total = len(items)
     log(f"   🌐 Unique servers: {total} (from {len(parsed_candidates)} links)")
 
@@ -737,7 +751,7 @@ async def check_and_create_balancer(
     parsed_candidates, source_name, max_servers,
     remarks_ok_template, remarks_fail,
     reserve_candidates=None, reserve_filter=None,
-    use_ping=True, extra_routing_rules=None,
+    use_ping=True, extra_routing_rules=None, omsk_time=None,
 ):
     """
     Создаёт один конфиг с балансировщиком из лучших max_servers серверов.
@@ -787,6 +801,11 @@ async def check_and_create_balancer(
     for src, cnt in src_count.items(): log(f"   📍 {src}: {cnt}")
     log(f"   🏆 Final: {len(best)}")
 
+    # Формируем remarks с временной меткой
+    if omsk_time is None:
+        omsk_time = get_omsk_time_str()
+    ok_remarks = f"{remarks_ok_template.format(count=len(best))} | ⏱ {omsk_time}"
+
     outbounds, tags = [], []
     for idx, cand in enumerate(best, start=1):
         tag = f"{cand.source}-{idx}"
@@ -795,7 +814,7 @@ async def check_and_create_balancer(
         outbounds.append(ob_copy)
         tags.append(tag)
 
-    config = create_config_template(remarks_ok_template.format(count=len(best)), extra_routing_rules)
+    config = create_config_template(ok_remarks, extra_routing_rules)
     config["outbounds"] = outbounds + [
         {"protocol": "freedom", "settings": {"domainStrategy": "UseIPv4"}, "tag": "direct"},
         {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"},
@@ -805,19 +824,21 @@ async def check_and_create_balancer(
     return config, alive, best
 
 
-def generate_chunked_configs(candidates, base_name, emoji, extra_rules=None):
+def generate_chunked_configs(candidates, base_name, emoji, extra_rules=None, omsk_time=None):
     """
     Разбивает список Candidate на чанки размером CHUNK_SIZE и создаёт для каждого
-    отдельный конфиг с балансировщиком. Имена конфигов: {emoji} {base_name}-{i} ✅ {count}
+    отдельный конфиг с балансировщиком. Имена конфигов: {emoji} {base_name}-{i} ✅ {count} | ⏱ {omsk_time}
     """
     if not candidates:
         return []
     candidates = sorted(candidates, key=lambda c: c.rtt)
     chunks = [candidates[i:i + CHUNK_SIZE] for i in range(0, len(candidates), CHUNK_SIZE)]
     safe_base = re.sub(r'[^a-zA-Z0-9]', '', base_name).lower() or "config"
+    if omsk_time is None:
+        omsk_time = get_omsk_time_str()
     configs = []
     for i, chunk in enumerate(chunks, start=1):
-        remarks = f"{emoji} {base_name}-{i} ✅ {len(chunk)}"
+        remarks = f"{emoji} {base_name}-{i} ✅ {len(chunk)} | ⏱ {omsk_time}"
         config = create_config_template(remarks, extra_rules)
         outbounds, tags = [], []
         for idx, cand in enumerate(chunk, start=1):
@@ -855,7 +876,7 @@ def _filter_paid_configs(configs):
     return filtered
 
 
-async def load_paid_subscription() -> List[Dict[str, Any]]:
+async def load_paid_subscription(omsk_time):
     if not PAID_SUB_URL:
         log_err("⚠️ PAID_SUB_URL не задан")
         return []
@@ -891,24 +912,33 @@ async def load_paid_subscription() -> List[Dict[str, Any]]:
                                 "protocol": srv["protocol"],
                                 "settings": {"servers": [{"address": srv["address"], "port": srv["port"]}]},
                                 "remarks": srv["remarks"]}, srv["remarks"]))
-            if ready: return _filter_paid_configs(ready)
+            if ready:
+                # Добавляем время к уже готовым конфигам
+                for cfg in ready:
+                    old_rem = cfg.get("remarks", "Платная подписка")
+                    cfg["remarks"] = f"{old_rem} | ⏱ {omsk_time}"
+                return _filter_paid_configs(ready)
             if obs:
                 return _filter_paid_configs(
-                    [create_single_outbound_config(ob, rm or ob.get("remarks", "")) for ob, rm in obs])
+                    [create_single_outbound_config(ob, rm or ob.get("remarks", ""), omsk_time) for ob, rm in obs])
             log_err("⚠️ Не удалось распознать элементы списка")
         elif isinstance(data, dict):
             if "outbounds" in data and "routing" in data:
+                old_rem = data.get("remarks", "Платная подписка")
+                data["remarks"] = f"{old_rem} | ⏱ {omsk_time}"
                 return _filter_paid_configs([data])
             if "outbounds" in data:
-                return _filter_paid_configs([
-                    create_single_outbound_config(ob, ob.get("remarks", "") or data.get("remarks", "Платная подписка"))
-                    for ob in data["outbounds"]])
+                paid = []
+                for ob in data["outbounds"]:
+                    old_rem = ob.get("remarks", "") or data.get("remarks", "Платная подписка")
+                    paid.append(create_single_outbound_config(ob, old_rem, omsk_time))
+                return _filter_paid_configs(paid)
             srv = _extract_server_from_dict(data)
             if srv:
                 return _filter_paid_configs([create_single_outbound_config({
                     "protocol": srv["protocol"],
                     "settings": {"servers": [{"address": srv["address"], "port": srv["port"]}]},
-                    "remarks": srv["remarks"]}, srv["remarks"])])
+                    "remarks": srv["remarks"]}, srv["remarks"], omsk_time)])
             log_err("⚠️ Неизвестный формат JSON")
         else:
             log_err("⚠️ Неожиданный тип JSON")
@@ -921,14 +951,15 @@ async def load_paid_subscription() -> List[Dict[str, Any]]:
                  if line.strip() and (pp := parse_proxy_url(line))]
         if items:
             return _filter_paid_configs(
-                [create_single_outbound_config(ob, rm or ob.get("remarks", "")) for ob, rm in items])
+                [create_single_outbound_config(ob, rm or ob.get("remarks", ""), omsk_time) for ob, rm in items])
         log_err("⚠️ Не удалось распарсить ссылки")
     return []
 
 
 # ===== MAIN =====
 async def main_async():
-    paid_configs = await load_paid_subscription()
+    omsk_time = get_omsk_time_str()
+    paid_configs = await load_paid_subscription(omsk_time)
     log(f"Итого платных конфигов: {len(paid_configs)}\n")
 
     white_links, black_links, extra_links = await asyncio.gather(
@@ -953,6 +984,7 @@ async def main_async():
         lte3_parsed, "LTE-3", MAX_LTE3,
         remarks_ok_template="🏳️LTE-3 ✅ {count}",
         remarks_fail="🏳️LTE-3 ⛔ Временно не работает",
+        omsk_time=omsk_time,
     )
 
     # 🏳️LTE-1: ПОСЛЕДНИЙ ШАНС. Все igareck с РУ-SNI, ЛЮБЫЕ регионы (включая РФ/РБ —
@@ -966,6 +998,7 @@ async def main_async():
         reserve_candidates=alive_lte3,
         reserve_filter=lambda c: is_lte_compatible(c),
         use_ping=False,
+        omsk_time=omsk_time,
     )
 
     # 🏳️LTE-2(no-ru): РУ-SNI + НЕ РФ/РБ по remarks (минимизируем подключение
@@ -980,6 +1013,7 @@ async def main_async():
         reserve_candidates=alive_lte3,
         reserve_filter=lambda c: is_lte_compatible(c) and not is_excluded_region(c.remarks),
         use_ping=False,
+        omsk_time=omsk_time,
     )
 
     # 🏴Wi-Fi-1: чёрный список, только для вайфая, с пингом.
@@ -989,6 +1023,7 @@ async def main_async():
         remarks_ok_template="🏴Wi-Fi-1 ✅ {count}",
         remarks_fail="🏴Wi-Fi-1 ⛔ Временно не работает",
         extra_routing_rules=WIFI_EXTRA_RULES,
+        omsk_time=omsk_time,
     )
 
     # ===== ДОПОЛНИТЕЛЬНЫЕ КОНФИГИ ИЗ ОСТАВШИХСЯ ЖИВЫХ СЕРВЕРОВ =====
@@ -999,11 +1034,7 @@ async def main_async():
     for p in white_parsed:
         if is_lte_compatible(p):
             all_lte_candidates.append(Candidate(p.outbound, p.remarks, p.address, p.port, 0.0, "LTE-White"))
-    # Extra – уже есть rtt из пинга (alive_lte3 содержит только живые, но нам нужны все, включая мёртвые? нет, только живые)
-    # Для дополнительных конфигов нужны только живые extra, которые уже есть в alive_lte3 (это список Candidate)
-    # Но alive_lte3 содержит только те, что прошли пинг. Добавим их.
-    # Однако в alive_lte3 уже есть RTT, и они могут быть уже использованы в LTE-1/2/3 как резерв или основные.
-    # Чтобы не дублировать, мы будем исключать использованные позже.
+    # Extra – уже есть rtt из пинга (alive_lte3 содержит только живые)
     all_lte_candidates.extend(alive_lte3)   # это уже Candidate с RTT
 
     # Собираем использованные адреса из LTE-1, LTE-2, LTE-3
@@ -1017,7 +1048,7 @@ async def main_async():
     log(f"\n📱 Дополнительные LTE: осталось {len(remaining_lte)} неиспользованных живых серверов")
 
     # Создаём дополнительные конфиги (LTE-4, LTE-5, ...)
-    extra_lte_configs = generate_chunked_configs(remaining_lte, "LTE", "🏳️")
+    extra_lte_configs = generate_chunked_configs(remaining_lte, "LTE", "🏳️", omsk_time=omsk_time)
     log(f"   Создано {len(extra_lte_configs)} дополнительных LTE-конфигов")
 
     # 2. Для Wi-Fi: берём все чёрные, исключаем использованные в Wi-Fi-1
@@ -1026,7 +1057,7 @@ async def main_async():
     remaining_wifi = [c for c in alive_wifi if (c.address, c.port) not in used_wifi]
     log(f"\n📱 Дополнительные Wi-Fi: осталось {len(remaining_wifi)} неиспользованных живых серверов")
 
-    extra_wifi_configs = generate_chunked_configs(remaining_wifi, "Wi-Fi", "🏴", extra_rules=WIFI_EXTRA_RULES)
+    extra_wifi_configs = generate_chunked_configs(remaining_wifi, "Wi-Fi", "🏴", extra_rules=WIFI_EXTRA_RULES, omsk_time=omsk_time)
     log(f"   Создано {len(extra_wifi_configs)} дополнительных Wi-Fi-конфигов")
 
     # Финальный список: основные + дополнительные + платные
