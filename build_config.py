@@ -799,7 +799,8 @@ async def main_async():
     # Generate configs
     lte_all_configs = generate_chunked_configs(lte_all_pool_dedup, "LTE", "🏳️", omsk_time)
     lte_no_ru_configs = generate_chunked_configs(lte_no_ru_pool_dedup, "LTE(no-ru)", "🏳️", omsk_time)
-    wifi_configs = generate_chunked_configs(alive_black, "Wi-Fi", "🏴", omsk_time, extra_routing_rules=WIFI_EXTRA_RULES)
+    # ===== ИСПРАВЛЕНИЕ: заменено extra_routing_rules на extra_rules =====
+    wifi_configs = generate_chunked_configs(alive_black, "Wi-Fi", "🏴", omsk_time, extra_rules=WIFI_EXTRA_RULES)
     
     final_configs = lte_all_configs + lte_no_ru_configs + wifi_configs + paid_configs
     
