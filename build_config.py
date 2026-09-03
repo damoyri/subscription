@@ -476,8 +476,8 @@ class TrojanHandler(ProtocolHandler):
                 stream["wsSettings"] = ws
             elif network == "grpc":
                 stream["grpcSettings"] = {"serviceName": params.get("serviceName", "")}
+            # allowInsecure удалён, так как в новых версиях Xray он запрещён
             stream["tlsSettings"] = {
-                "allowInsecure": params.get("allowInsecure", "0") == "1",
                 "serverName": params.get("sni", address),
                 "fingerprint": clean_fingerprint(params.get("fingerprint")),
             }
@@ -509,7 +509,7 @@ class TrojanHandler(ProtocolHandler):
                 if svc: params["serviceName"] = svc
             if t.get("serverName"): params["sni"] = t["serverName"]
             if t.get("fingerprint"): params["fp"] = t["fingerprint"]
-            if t.get("allowInsecure"): params["allowInsecure"] = "1"
+            # allowInsecure не добавляем
             url = f"trojan://{password}@{bracket_if_ipv6(address)}:{port}"
             if params: url += "?" + "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items())
             if remarks: url += "#" + urllib.parse.quote(remarks)
