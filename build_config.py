@@ -770,30 +770,41 @@ async def check_and_create_balancer(
     """
     log(f"\n🔍 Checking source: {source_name} (total {len(parsed_candidates)})")
     fail_config = strip_balancer_for_empty(create_config_template(remarks_fail, extra_routing_rules))
-    if not parsed_candidates:
-        return fail_config, [], []
-
-    if use_ping:
-        rtt_map = await ping_candidates(parsed_candidates)
-        alive = [Candidate(p.outbound, p.remarks, p.address, p.port,
-                           rtt_map[(p.address, p.port)], source_name)
-                 for p in parsed_candidates if rtt_map.get((p.address, p.port)) is not None]
-    else:
-        # Без пинга — все считаются живыми (rtt=0)
-        log("   ⏭️ Без пинга — проверку оставлю балансировщику клиента")
-        alive = [Candidate(p.outbound, p.remarks, p.address, p.port, 0.0, source_name)
-                 for p in parsed_candidates]
-
-    log(f"   ✅ Alive: {len(alive)}")
+    
+    alive = []
+    if parsed_candidates:
+        if use_ping:
+            rtt_map = await ping_candidates(parsed_candidates)
+            alive = [Candidate(p.outbound, p.remarks, p.address, p.port,
+                               rtt_map[(p.address, p.port)], source_name)
+                     for p in parsed_candidates if rtt_map.get((p.address, p.port)) is not None]
+        else:
+            log("   ⏭️ Без пинга — проверку оставлю балансировщику клиента")
+            alive = [Candidate(p.outbound, p.remarks, p.address, p.port, 0.0, source_name)
+                     for p in parsed_candidates]
+    
+    # Если нет живых из основного источника, но есть резерв, используем резерв
+    if not alive and reserve_candidates:
+        log(f"   ⚠️ Нет живых из {source_name}, используем резерв")
+        # Фильтруем резерв
+        if reserve_filter:
+            reserve_filtered = [c for c in reserve_candidates if reserve_filter(c)]
+        else:
+            reserve_filtered = reserve_candidates
+        if reserve_filtered:
+            alive = reserve_filtered[:]  # берём все, потом ограничим max_servers
+    
     if not alive:
+        log(f"   ❌ Нет живых серверов для {source_name}")
         return fail_config, [], []
 
     alive.sort(key=lambda c: c.rtt)
     best = alive[:max_servers]
     used_addrs = {(c.address, c.port) for c in best}
 
-    # Добор из резерва (резервные серверы уже имеют свои RTT)
-    if reserve_candidates:
+    # Добор из резерва (если уже взяли из резерва, то ничего не добавляем, т.к. уже взяли все, что есть)
+    # Но если alive содержал какие-то из основного, можно добирать из резерва
+    if reserve_candidates and len(best) < max_servers:
         added = 0
         for c in sorted(reserve_candidates, key=lambda c: c.rtt):
             if len(best) >= max_servers: break
@@ -809,7 +820,6 @@ async def check_and_create_balancer(
     for src, cnt in src_count.items(): log(f"   📍 {src}: {cnt}")
     log(f"   🏆 Final: {len(best)}")
 
-    # Формируем remarks с временной меткой
     if omsk_time is None:
         omsk_time = get_omsk_time_str()
     ok_remarks = f"{remarks_ok_template.format(count=len(best))} | ⏱ {omsk_time}"
@@ -995,25 +1005,29 @@ async def main_async():
         omsk_time=omsk_time,
     )
 
-    # 🏳️LTE-1: ПОСЛЕДНИЙ ШАНС. Все igareck с РУ-SNI, ЛЮБЫЕ регионы (включая РФ/РБ —
-    # оператор пропускает по белому SNI). Без пинга, добор РУ-SNI из живых LTE-3.
+    # 🏳️LTE-1: ПОСЛЕДНИЙ ШАНС. Сначала фильтруем по РУ-SNI.
     lte1_parsed = [p for p in white_parsed if is_lte_compatible(p)]
-    log(f"📱 LTE-1: igareck с РУ-SNI (все регионы): {len(lte1_parsed)}")
+    if not lte1_parsed:
+        log("⚠️ Нет конфигов с РУ-SNI среди белых, беру все белые без фильтрации SNI для LTE-1")
+        lte1_parsed = white_parsed[:]  # все, без фильтрации
+    log(f"📱 LTE-1: igareck (все регионы): {len(lte1_parsed)}")
     config_lte1, _, selected_lte1 = await check_and_create_balancer(
         lte1_parsed, "LTE-1", MAX_LTE1,
         remarks_ok_template="🏳️LTE-1 ✅ {count}",
         remarks_fail="🏳️LTE-1 ⛔ Временно не работает",
         reserve_candidates=alive_lte3,
-        reserve_filter=lambda c: is_lte_compatible(c),
+        reserve_filter=lambda c: is_lte_compatible(c),  # резерв только с РУ-SNI
         use_ping=False,
         omsk_time=omsk_time,
     )
 
-    # 🏳️LTE-2(no-ru): РУ-SNI + НЕ РФ/РБ по remarks (минимизируем подключение
-    # к России/Беларуси, где блочат). Без пинга, добор из LTE-3 с теми же фильтрами.
+    # 🏳️LTE-2(no-ru): РУ-SNI + НЕ РФ/РБ
     lte2_parsed = [p for p in white_parsed
                    if is_lte_compatible(p) and not is_excluded_region(p.remarks)]
-    log(f"📱 LTE-2: igareck с РУ-SNI и НЕ РФ/РБ: {len(lte2_parsed)}")
+    if not lte2_parsed:
+        log("⚠️ Нет конфигов с РУ-SNI и без РФ/РБ, беру все белые без фильтрации SNI, но исключая РФ/РБ для LTE-2")
+        lte2_parsed = [p for p in white_parsed if not is_excluded_region(p.remarks)]
+    log(f"📱 LTE-2: igareck (не РФ/РБ): {len(lte2_parsed)}")
     config_lte2, _, selected_lte2 = await check_and_create_balancer(
         lte2_parsed, "LTE-2", MAX_LTE2,
         remarks_ok_template="🏳️LTE-2(no-ru) ✅ {count}",
