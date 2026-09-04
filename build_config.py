@@ -179,7 +179,11 @@ def _is_ip(s: str) -> bool:
         return False
 
 def is_lte_compatible(p) -> bool:
-    """Живёт ли конфиг на LTE: смотрим SNI в reality/tls."""
+    """
+    Живёт ли конфиг на LTE: смотрим SNI в reality/tls.
+    Расширено: любой SNI, оканчивающийся на .ru, считается совместимым,
+    т.к. оператор пропускает такие домены (в том числе и не из белого списка).
+    """
     stream = p.outbound.get("streamSettings", {})
     sni = ""
     if stream.get("security") == "reality":
@@ -189,7 +193,13 @@ def is_lte_compatible(p) -> bool:
     if not sni:
         return False
     sni = sni.lower()
-    return any(sni == d or sni.endswith("." + d) for d in LTE_SNI_WHITELIST)
+    # Проверка по белому списку
+    if any(sni == d or sni.endswith("." + d) for d in LTE_SNI_WHITELIST):
+        return True
+    # Дополнительно: любой .ru домен считается совместимым для LTE
+    if sni.endswith(".ru"):
+        return True
+    return False
 
 
 async def fetch_url(url, timeout=15.0):
@@ -476,7 +486,6 @@ class TrojanHandler(ProtocolHandler):
                 stream["wsSettings"] = ws
             elif network == "grpc":
                 stream["grpcSettings"] = {"serviceName": params.get("serviceName", "")}
-            # allowInsecure удалён, так как в новых версиях Xray он запрещён
             stream["tlsSettings"] = {
                 "serverName": params.get("sni", address),
                 "fingerprint": clean_fingerprint(params.get("fingerprint")),
@@ -509,7 +518,6 @@ class TrojanHandler(ProtocolHandler):
                 if svc: params["serviceName"] = svc
             if t.get("serverName"): params["sni"] = t["serverName"]
             if t.get("fingerprint"): params["fp"] = t["fingerprint"]
-            # allowInsecure не добавляем
             url = f"trojan://{password}@{bracket_if_ipv6(address)}:{port}"
             if params: url += "?" + "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items())
             if remarks: url += "#" + urllib.parse.quote(remarks)
