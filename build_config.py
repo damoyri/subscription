@@ -21,6 +21,11 @@ from datetime import datetime, timedelta, timezone
 
 # ===== КОНФИГУРАЦИЯ =====
 PAID_SUB_URL = os.environ.get("PAID_SUB_URL", "")
+PAID_SUB_URL_2 = os.environ.get("PAID_SUB_URL_2", "")   # вторая подписка
+
+# Максимальное количество дополнительных конфигов (файлов) для LTE и Wi-Fi
+MAX_EXTRA_LTE_CONFIGS = int(os.environ.get("MAX_EXTRA_LTE_CONFIGS", "5"))
+MAX_EXTRA_WIFI_CONFIGS = int(os.environ.get("MAX_EXTRA_WIFI_CONFIGS", "5"))
 
 WHITE_URLS = [
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt",
@@ -893,28 +898,11 @@ def _filter_paid_configs(configs):
     log(f"📊 После фильтрации осталось {len(filtered)} платных конфигов")
     return filtered
 
-
-async def load_paid_subscription(omsk_time):
-    if not PAID_SUB_URL:
-        log_err("⚠️ PAID_SUB_URL не задан")
-        return []
-    raw = await fetch_url(PAID_SUB_URL)
-
-    if not raw:
-        log("⚠️ Не удалось загрузить подписку, восстанавливаем из subscription.json...")
-        try:
-            with open("subscription.json", "r", encoding="utf-8") as f:
-                old = json.load(f)
-            if isinstance(old, list):
-                paid_only = _filter_paid_configs(old)
-                log(f"🔄 Восстановлено {len(paid_only)} платных конфигов")
-                return paid_only
-        except Exception as e:
-            log_err(f"⚠️ Ошибка чтения subscription.json: {e}")
-        return []
-
+# ===== НОВАЯ ФУНКЦИЯ ДЛЯ ПАРСИНГА ОДНОЙ ПОДПИСКИ =====
+async def parse_paid_data(raw_data: str, omsk_time: str) -> List[Dict]:
+    """Парсит сырые данные подписки (JSON или ссылки) и возвращает список готовых конфигов."""
     try:
-        data = json.loads(raw)
+        data = json.loads(raw_data)
         if isinstance(data, list):
             ready, obs = [], []
             for item in data:
@@ -931,7 +919,6 @@ async def load_paid_subscription(omsk_time):
                                 "settings": {"servers": [{"address": srv["address"], "port": srv["port"]}]},
                                 "remarks": srv["remarks"]}, srv["remarks"]))
             if ready:
-                # Добавляем время к уже готовым конфигам
                 for cfg in ready:
                     old_rem = cfg.get("remarks", "Платная подписка")
                     cfg["remarks"] = f"{old_rem} | ⏱ {omsk_time}"
@@ -939,7 +926,6 @@ async def load_paid_subscription(omsk_time):
             if obs:
                 return _filter_paid_configs(
                     [create_single_outbound_config(ob, rm or ob.get("remarks", ""), omsk_time) for ob, rm in obs])
-            log_err("⚠️ Не удалось распознать элементы списка")
         elif isinstance(data, dict):
             if "outbounds" in data and "routing" in data:
                 old_rem = data.get("remarks", "Платная подписка")
@@ -957,21 +943,41 @@ async def load_paid_subscription(omsk_time):
                     "protocol": srv["protocol"],
                     "settings": {"servers": [{"address": srv["address"], "port": srv["port"]}]},
                     "remarks": srv["remarks"]}, srv["remarks"], omsk_time)])
-            log_err("⚠️ Неизвестный формат JSON")
-        else:
-            log_err("⚠️ Неожиданный тип JSON")
     except json.JSONDecodeError:
+        # Пробуем как base64 или просто ссылки
         try:
-            decoded = base64.b64decode(raw).decode("utf-8")
+            decoded = base64.b64decode(raw_data).decode("utf-8")
         except Exception:
-            decoded = raw
+            decoded = raw_data
         items = [(pp.outbound, pp.remarks) for line in decoded.splitlines()
                  if line.strip() and (pp := parse_proxy_url(line))]
         if items:
             return _filter_paid_configs(
                 [create_single_outbound_config(ob, rm or ob.get("remarks", ""), omsk_time) for ob, rm in items])
-        log_err("⚠️ Не удалось распарсить ссылки")
     return []
+
+
+# ===== ОБНОВЛЁННАЯ ФУНКЦИЯ ЗАГРУЗКИ ПЛАТНОЙ ПОДПИСКИ (несколько URL) =====
+async def load_paid_subscription(omsk_time):
+    urls = [PAID_SUB_URL, PAID_SUB_URL_2]
+    urls = [u.strip() for u in urls if u.strip()]
+    if not urls:
+        log_err("⚠️ PAID_SUB_URL не задан")
+        return []
+
+    all_configs = []
+    for url in urls:
+        log(f"📥 Загрузка платной подписки: {url}")
+        raw = await fetch_url(url)
+        if not raw:
+            log(f"⚠️ Не удалось загрузить {url}, пропускаем")
+            continue
+        parsed = await parse_paid_data(raw, omsk_time)
+        if parsed:
+            all_configs.extend(parsed)
+
+    # Фильтруем, чтобы исключить наши автоматические маркеры (уже сделано внутри parse_paid_data, но на всякий случай)
+    return _filter_paid_configs(all_configs)
 
 
 # ===== MAIN =====
@@ -1071,7 +1077,9 @@ async def main_async():
 
     # Создаём дополнительные конфиги (LTE-4, LTE-5, ...)
     extra_lte_configs = generate_chunked_configs(remaining_lte, "LTE", "🏳️", omsk_time=omsk_time)
-    log(f"   Создано {len(extra_lte_configs)} дополнительных LTE-конфигов")
+    # Ограничиваем количество файлов
+    extra_lte_configs = extra_lte_configs[:MAX_EXTRA_LTE_CONFIGS]
+    log(f"   Создано {len(extra_lte_configs)} дополнительных LTE-конфигов (макс. {MAX_EXTRA_LTE_CONFIGS})")
 
     # 2. Для Wi-Fi: берём все чёрные, исключаем использованные в Wi-Fi-1
     used_wifi = {(c.address, c.port) for c in selected_wifi1}
@@ -1080,7 +1088,8 @@ async def main_async():
     log(f"\n📱 Дополнительные Wi-Fi: осталось {len(remaining_wifi)} неиспользованных живых серверов")
 
     extra_wifi_configs = generate_chunked_configs(remaining_wifi, "Wi-Fi", "🏴", extra_rules=WIFI_EXTRA_RULES, omsk_time=omsk_time)
-    log(f"   Создано {len(extra_wifi_configs)} дополнительных Wi-Fi-конфигов")
+    extra_wifi_configs = extra_wifi_configs[:MAX_EXTRA_WIFI_CONFIGS]
+    log(f"   Создано {len(extra_wifi_configs)} дополнительных Wi-Fi-конфигов (макс. {MAX_EXTRA_WIFI_CONFIGS})")
 
     # Финальный список: основные + дополнительные + платные
     final_configs = [config_lte1, config_lte2, config_lte3, config_wifi1] + extra_lte_configs + extra_wifi_configs + paid_configs
