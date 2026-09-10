@@ -4,16 +4,22 @@ import sys
 import urllib.request
 
 # ================= НАСТРОЙКИ =================
-MAX_CONFIGS = 200  # Максимальное количество конфигов (регулируй здесь)
+MAX_CONFIGS = 200  # Максимальное количество конфигов
 OUTPUT_FILE = "subscription.json"  # Итоговый файл со ссылками
 
 URLS = [
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-CIDR-RU-all.txt",
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt",
 ]
-
-VALID_SCHEMES = ("vless://", "vmess://", "trojan://", "ss://")
 # =============================================
+
+
+def is_valid_config(line: str) -> bool:
+    """Забираем любые строки, содержащие ссылку на протокол (любой ://)."""
+    line = line.strip()
+    if not line or line.startswith("#"):
+        return False
+    return "://" in line
 
 
 def fetch_url(url: str) -> list[str]:
@@ -27,7 +33,7 @@ def fetch_url(url: str) -> list[str]:
             lines = []
             for line in content.splitlines():
                 line = line.strip()
-                if line and any(line.startswith(s) for s in VALID_SCHEMES):
+                if is_valid_config(line):
                     lines.append(line)
             return lines
     except Exception as e:
@@ -36,14 +42,14 @@ def fetch_url(url: str) -> list[str]:
 
 
 def main():
-    # 1. Читаем уже существующие конфиги из файла (если файл есть)
+    # 1. Читаем уже имеющиеся конфиги из файла
     existing_configs = []
     if os.path.exists(OUTPUT_FILE):
         try:
             with open(OUTPUT_FILE, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
-                    if line and any(line.startswith(s) for s in VALID_SCHEMES):
+                    if is_valid_config(line):
                         existing_configs.append(line)
             print(
                 f"📖 Загружено имеющихся конфигов из {OUTPUT_FILE}: {len(existing_configs)}"
@@ -53,7 +59,7 @@ def main():
                 f"⚠️ Ошибка чтения файла {OUTPUT_FILE}: {e}", file=sys.stderr
             )
 
-    # 2. Загружаем свежие конфиги из внешних источников
+    # 2. Скачиваем свежие ссылки
     new_downloaded = []
     for url in URLS:
         print(f"📥 Скачиваем: {url}")
@@ -61,23 +67,21 @@ def main():
         print(f"   Найдено {len(fetched)} конфигов")
         new_downloaded.extend(fetched)
 
-    # 3. Объединяем: Новые скачанные ставим НАВЕРХ, старые смещаем ВНИЗ
+    # 3. Новые ссылки ставим НАВЕРХ, старые смещаем ВНИЗ
     combined = []
     seen = set()
 
-    # Сначала добавляем свежие
     for cfg in new_downloaded:
         if cfg not in seen:
             seen.add(cfg)
             combined.append(cfg)
 
-        # Затем добавляем старые
     for cfg in existing_configs:
         if cfg not in seen:
             seen.add(cfg)
             combined.append(cfg)
 
-    # 4. Обрезаем список до лимита MAX_CONFIGS (все что дальше 200 — удаляется)
+    # 4. Обрезаем ровно до MAX_CONFIGS
     final_configs = combined[:MAX_CONFIGS]
 
     print(f"\n📊 Всего уникальных конфигов: {len(combined)}")
