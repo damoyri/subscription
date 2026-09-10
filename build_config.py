@@ -2,12 +2,10 @@
 """
 build_config.py — финальный сборщик VPN-конфигов для xray-core клиентов.
 Сборки:
-• 🏳️LTE-1 — ПОСЛЕДНИЙ ШАНС на мобилке: igareck с РУ-SNI (любые регионы,
-  включая РФ/РБ — оператор пропускает по белому SNI), без пинга, добор из LTE-3.
-• 🏳️LTE-2(no-ru) — для мобильного: РУ-SNI + НЕ РФ/РБ по remarks
-  (минимизируем подключение к России/Беларуси, где блочат), без пинга, добор из LTE-3.
-• 🏳️LTE-3 — extra (goida 26), с пингом и второй попыткой.
-• 🏴Wi-Fi-1 — чёрные списки, с пингом, только для вайфая.
+• 🏳️LTE-1 — Максимум доступных конфигов со всех ссылок (добор из LTE-3)
+• 🏳️LTE-2(no-ru) — Исключительно новые сервера (не вошедшие в LTE-1) без РФ/РБ
+• 🏳️LTE-3 — Оставшиеся сервера из резерва (с пингом)
+• 🏳️LTE-4 / LTE-5... — Динамические дополнительные чанки из всех оставшихся серверов
 Платные конфиги не сортируются — как пришли, так и лежат.
 """
 from __future__ import annotations
@@ -17,7 +15,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 import copy
 
-# ===== КОНФИГУРАЦИЯ =====
+# ===== КОНФИГУРАЦИЯ И ПАРАМЕТРЫ =====
 PAID_SUB_URL = os.environ.get("PAID_SUB_URL", "")
 
 WHITE_URLS = [
@@ -34,17 +32,17 @@ EXTRA_URLS = [
 TCP_TIMEOUT = 7.0
 PING_BATCH = 300
 RETRY_ATTEMPTS = 3
-SCRIPT_TIMEOUT = 20 * 60  # жёсткий потолок на весь скрипт, чтобы cron-джоба не зависла навечно
+SCRIPT_TIMEOUT = 20 * 60  # жёсткий потолок на весь скрипт
 
-MAX_LTE1 = 100    # 🏳️LTE-1
-MAX_LTE2 = 150    # 🏳️LTE-2(no-ru)
-MAX_LTE3 = 100    # 🏳️LTE-3
-MAX_WIFI = 100    # 🏴Wi-Fi-1
+# --- НАСТРОЙКИ ЧАНКОВ (ЛИМИТЫ СЕРВЕРОВ) ---
+MAX_LTE1 = 150          # 🏳️LTE-1: Абсолютно все конфиги из основных ссылок (до 150 шт.)
+MAX_LTE2 = 150          # 🏳️LTE-2(no-ru): Новые конфиги без РФ/РБ
+MAX_LTE3 = 100          # 🏳️LTE-3: Оставшиеся из основного резерва
+EXTRA_CHUNK_SIZE = 100  # Сколько серверов в каждом доп. чанке (LTE-4, LTE-5...)
+MAX_EXTRA_CHUNKS = 5    # Максимум дополнительных чанков (например, 5 создаст до LTE-8 включительно)
 
 VALID_FINGERPRINTS = {"chrome", "firefox", "edge", "safari", "ios", "android", "qq", "random"}
 
-# Транспорты, которые реально живут в xray-core. Всё остальное выкидываем —
-# один кривой outbound убивает ВЕСЬ конфиг при парсе.
 SUPPORTED_NETWORKS = {"tcp", "raw", "ws", "websocket", "grpc", "gun", "httpupgrade"}
 NETWORK_NORMALIZE = {"raw": "tcp", "websocket": "ws", "gun": "grpc"}
 
@@ -55,7 +53,6 @@ _SECRET_PATTERN = re.compile(
     r"|(?<=://)[^@/\s]{10,}(?=@)"
 )
 
-# ===== РУ-СЕРВИСЫ НАПРЯМУЮ (без Сбера/Тинькофф) =====
 RU_DIRECT_DOMAINS = [
     "yandex.ru", "yandex.com", "ya.ru", "dzen.ru", "dzen.com",
     "maps.yandex.ru", "taxi.yandex.ru", "eda.yandex.ru",
@@ -76,62 +73,25 @@ RU_DIRECT_DOMAINS = [
 ]
 RU_DOMAIN_SUFFIXES = [f".{d}" for d in RU_DIRECT_DOMAINS]
 
-# ===== Wi-Fi-1: ВСЯ зона .ru — напрямую, минуя VPN =====
-# regexp вместо geosite/domain:suffix — не требует ассетов (geosite.dat) на клиенте
-# и работает одинаково во всех сборках xray-core (GUI-клиенты на телефонах часто
-# не подтягивают geosite/geoip автоматически).
-WIFI_EXTRA_RULES = [
-    {"type": "field", "domain": ["regexp:\\.ru$"], "outboundTag": "direct"},
-]
-
-# ===== SNI, которые оператор пропускает на LTE (как у платных ОБХОД LTE) =====
 LTE_SNI_WHITELIST = (
-    # Мессенджеры / соцсети / почта
     "vk.com", "vk.ru", "vk-portal.net", "userapi.com", "ok.ru", "okcdn.ru",
-    "mail.ru", "rambler.ru", "max.ru", "oneme.ru", "tamtam.ru",
-    "mradx.net",  # mail.ru CDN
-    
-    # Яндекс экосистема
+    "mail.ru", "rambler.ru", "max.ru", "oneme.ru", "tamtam.ru", "mradx.net",
     "yandex.ru", "yandex.com", "yandex.net", "ya.ru",
-    "dzen.ru", "kinopoisk.ru", "rutube.ru", "yastatic.net",
-    "yandexcloud.net", "yastatic.net",
-    
-    # Маркетплейсы / ритейл
-    "ozon.ru", "ozone.ru", "wildberries.ru", "wb.ru",
-    "avito.ru", "avito.st",
-    "x5.ru", "ads.x5.ru", "lk.x5.ru",
-    "lemanapro.ru",  # Леруа Мерлен
-    
-    # Банки / финансы (осторожно, не все работают напрямую)
-    "alfabank.ru", "sberbank.ru", "vtb.ru", "tbank.ru",
-    "tinkoff.ru", "cdn-tinkoff.ru",
-    "yoomoney.ru",
-    
-    # Госуслуги / госсайты
-    "gosuslugi.ru", "digital.gov.ru", "government.ru",
-    "kremlin.ru", "duma.gov.ru", "cikrf.ru", "izbirkom.ru",
-    "mos.ru", "mosreg.ru", "nalog.ru", "gu-st.ru",
-    "roskachestvo.gov.ru", "onf.ru",
-    
-    # Транспорт / сервисы
-    "rzd.ru", "pochta.ru", "taximaxim.ru", "tutu.ru",
-    "2gis.ru", "2gis.com",
-    "evotor.ru", "ofd.ru", "lizaalert.org",
-    
-    # Медиа
-    "t2.ru",  # Теле2
-    "gazeta.ru", "lenta.ru", "kp.ru", "rbc.ru",
-    
-    # Прочее полезное
-    "dobro.ru", "hrlink.ru", "sochisirius.ru", "sirius.online",
-    "mediavitrina.ru", "trbcdn.net", "ngenix.net",
+    "dzen.ru", "kinopoisk.ru", "rutube.ru", "yastatic.net", "yandexcloud.net",
+    "ozon.ru", "ozone.ru", "wildberries.ru", "wb.ru", "avito.ru", "avito.st",
+    "x5.ru", "ads.x5.ru", "lk.x5.ru", "lemanapro.ru",
+    "alfabank.ru", "sberbank.ru", "vtb.ru", "tbank.ru", "tinkoff.ru", "cdn-tinkoff.ru", "yoomoney.ru",
+    "gosuslugi.ru", "digital.gov.ru", "government.ru", "kremlin.ru", "duma.gov.ru", "cikrf.ru", "izbirkom.ru",
+    "mos.ru", "mosreg.ru", "nalog.ru", "gu-st.ru", "roskachestvo.gov.ru", "onf.ru",
+    "rzd.ru", "pochta.ru", "taximaxim.ru", "tutu.ru", "2gis.ru", "2gis.com", "evotor.ru", "ofd.ru", "lizaalert.org",
+    "t2.ru", "gazeta.ru", "lenta.ru", "kp.ru", "rbc.ru",
+    "dobro.ru", "hrlink.ru", "sochisirius.ru", "sirius.online", "mediavitrina.ru", "trbcdn.net", "ngenix.net",
 )
 
 
 def mask_secret(t): return _SECRET_PATTERN.sub("<REDACTED>", t)
 def log(msg): print(mask_secret(msg), flush=True)
 def log_err(msg): print(mask_secret(msg), file=sys.stderr, flush=True)
-
 
 def clean_fingerprint(fp):
     if not fp: return "chrome"
@@ -156,7 +116,6 @@ def _is_ip(s: str) -> bool:
         return False
 
 def is_lte_compatible(p) -> bool:
-    """Живёт ли конфиг на LTE: смотрим SNI в reality/tls."""
     stream = p.outbound.get("streamSettings", {})
     sni = ""
     if stream.get("security") == "reality":
@@ -167,7 +126,6 @@ def is_lte_compatible(p) -> bool:
         return False
     sni = sni.lower()
     return any(sni == d or sni.endswith("." + d) for d in LTE_SNI_WHITELIST)
-
 
 async def fetch_url(url, timeout=15.0):
     for attempt in range(RETRY_ATTEMPTS):
@@ -187,21 +145,13 @@ async def fetch_url(url, timeout=15.0):
             await asyncio.sleep(2 ** attempt)
     return None
 
-
-def create_config_template(remarks_text, extra_rules=None):
-    """Шаблон как в старых РАБОЧИХ версиях + expected 4 как у платных.
-
-    extra_rules: доп. правила routing.rules, вставляются ПЕРЕД catch-all
-    правилом на балансировщик (например, WIFI_EXTRA_RULES для Wi-Fi-1).
-    """
+def create_config_template(remarks_text):
     rules = [
         {"type": "field", "protocol": ["bittorrent"], "outboundTag": "direct"},
         {"type": "field", "domain": RU_DIRECT_DOMAINS, "outboundTag": "direct"},
         {"type": "field", "domain": RU_DOMAIN_SUFFIXES, "outboundTag": "direct"},
+        {"type": "field", "network": "tcp,udp", "balancerTag": "WL_Balancer"}
     ]
-    if extra_rules:
-        rules.extend(extra_rules)
-    rules.append({"type": "field", "network": "tcp,udp", "balancerTag": "WL_Balancer"})
 
     return {
         "log": {"loglevel": "warning"},
@@ -254,7 +204,6 @@ def create_config_template(remarks_text, extra_rules=None):
         "remarks": remarks_text,
     }
 
-
 def strip_balancer_for_empty(config):
     config["routing"]["rules"] = [
         {"type": "field", "protocol": ["bittorrent"], "outboundTag": "direct"},
@@ -267,7 +216,6 @@ def strip_balancer_for_empty(config):
         {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"}
     ]
     return config
-
 
 def create_single_outbound_config(outbound, remarks):
     if not remarks:
@@ -285,14 +233,12 @@ def create_single_outbound_config(outbound, remarks):
     config["burstObservatory"]["subjectSelector"] = ["paid-1"]
     return config
 
-
 @dataclass
 class ParsedProxy:
     outbound: Dict[str, Any]
     remarks: str
     address: str
     port: int
-
 
 class ProtocolHandler(ABC):
     scheme: str
@@ -315,7 +261,6 @@ class ProtocolHandler(ABC):
         n = NETWORK_NORMALIZE.get(n, n)
         return n if n in SUPPORTED_NETWORKS else None
 
-
 class VlessHandler(ProtocolHandler):
     scheme = "vless://"
 
@@ -335,13 +280,10 @@ class VlessHandler(ProtocolHandler):
             fingerprint = clean_fingerprint(params.get("fp") or params.get("fingerprint"))
             is_reality = ("pbk" in params) or ("publicKey" in params) or (params.get("security") == "reality")
             if is_reality and not (params.get("pbk") or params.get("publicKey")): return None
-            # REALITY в xray-core живёт ТОЛЬКО на tcp/grpc/xhttp —
-            # reality+ws/httpupgrade убивает весь конфиг при парсе
             if is_reality and network not in ("tcp", "grpc"):
                 return None
 
-            stream: Dict[str, Any] = {"network": network,
-                                      "security": "reality" if is_reality else "tls"}
+            stream: Dict[str, Any] = {"network": network, "security": "reality" if is_reality else "tls"}
             if network == "tcp":
                 stream["tcpSettings"] = {"header": {"type": params.get("headerType", "none")}}
             elif network == "ws":
@@ -351,15 +293,13 @@ class VlessHandler(ProtocolHandler):
             elif network == "grpc":
                 stream["grpcSettings"] = {"serviceName": params.get("serviceName", "")}
             elif network == "httpupgrade":
-                stream["httpUpgradeSettings"] = {"path": params.get("path", "/"),
-                                                 "host": params.get("host", "")}
+                stream["httpUpgradeSettings"] = {"path": params.get("path", "/"), "host": params.get("host", "")}
 
             outbound = {
                 "tag": None, "protocol": "vless",
                 "settings": {"vnext": [{
                     "address": address, "port": port,
-                    "users": [{"id": user_id, "encryption": "none",
-                               "flow": params.get("flow", ""), "level": 8}]
+                    "users": [{"id": user_id, "encryption": "none", "flow": params.get("flow", ""), "level": 8}]
                 }]},
                 "streamSettings": stream,
             }
@@ -430,7 +370,6 @@ class VlessHandler(ProtocolHandler):
         except Exception:
             return None
 
-
 class TrojanHandler(ProtocolHandler):
     scheme = "trojan://"
 
@@ -471,7 +410,7 @@ class TrojanHandler(ProtocolHandler):
         try:
             s = outbound["settings"]["servers"][0]
             address, port, password = s.get("address"), s.get("port"), s.get("password")
-            if not (address and port and password): return None
+            if not all([address, port, password]): return None
             stream = outbound.get("streamSettings", {})
             t = stream.get("tlsSettings", {})
             params = {}
@@ -493,7 +432,6 @@ class TrojanHandler(ProtocolHandler):
         except Exception:
             return None
 
-
 class ShadowsocksHandler(ProtocolHandler):
     scheme = "ss://"
 
@@ -514,8 +452,7 @@ class ShadowsocksHandler(ProtocolHandler):
             address, port = normalize_address(address_raw), int(port_str)
             outbound = {
                 "tag": None, "protocol": "shadowsocks",
-                "settings": {"servers": [{"address": address, "port": port,
-                                          "method": method, "password": password}]},
+                "settings": {"servers": [{"address": address, "port": port, "method": method, "password": password}]},
             }
             outbound["remarks"] = remarks
             return ParsedProxy(outbound, remarks, address, port)
@@ -533,7 +470,6 @@ class ShadowsocksHandler(ProtocolHandler):
             return url
         except Exception:
             return None
-
 
 class VmessHandler(ProtocolHandler):
     scheme = "vmess://"
@@ -611,11 +547,9 @@ class VmessHandler(ProtocolHandler):
         except Exception:
             return None
 
-
 PROTOCOL_REGISTRY = [
     VlessHandler(), TrojanHandler(), ShadowsocksHandler(), VmessHandler(),
 ]
-
 
 def parse_proxy_url(raw_url):
     url = raw_url.strip()
@@ -623,7 +557,6 @@ def parse_proxy_url(raw_url):
         if url.startswith(handler.scheme):
             return handler.parse(url)
     return None
-
 
 async def get_links_from_urls(urls):
     all_links = []
@@ -638,8 +571,7 @@ async def get_links_from_urls(urls):
                     all_links.append(line)
     return list(dict.fromkeys(all_links))
 
-
-# ===== ПИНГ (только LTE-3 и Wi-Fi-1) =====
+# ===== ПИНГ =====
 async def tcp_ping(host, port, timeout=TCP_TIMEOUT):
     start = time.monotonic()
     try:
@@ -650,7 +582,6 @@ async def tcp_ping(host, port, timeout=TCP_TIMEOUT):
         return time.monotonic() - start
     except Exception:
         return None
-
 
 async def tls_ping(host, port, timeout=TCP_TIMEOUT):
     start = time.monotonic()
@@ -668,15 +599,12 @@ async def tls_ping(host, port, timeout=TCP_TIMEOUT):
     except Exception:
         return None
 
-
 async def check_server(p: ParsedProxy):
     if p.outbound.get("protocol") in ("vless", "vmess", "trojan"):
         return await tls_ping(p.address, p.port)
     return await tcp_ping(p.address, p.port)
 
-
 async def ping_candidates(parsed_candidates):
-    """Уникальные (address,port), батчами, с прогрессом и второй попыткой."""
     uniq: Dict[Tuple[str, int], ParsedProxy] = {}
     for p in parsed_candidates:
         uniq.setdefault((p.address, p.port), p)
@@ -707,7 +635,6 @@ async def ping_candidates(parsed_candidates):
         log(f"   ✅ Со второй попытки ожило: {revived}")
     return rtt_map
 
-
 @dataclass
 class Candidate:
     outbound: Dict[str, Any]
@@ -717,41 +644,37 @@ class Candidate:
     rtt: float = 0.0
     source: str = ""
 
-
 async def check_and_create_balancer(
     parsed_candidates, source_name, max_servers,
     remarks_ok_template, remarks_fail,
     reserve_candidates=None, reserve_filter=None,
-    use_ping=True, extra_routing_rules=None,
+    use_ping=True,
 ):
     log(f"\n🔍 Checking source: {source_name} (total {len(parsed_candidates)})")
-    fail_config = strip_balancer_for_empty(create_config_template(remarks_fail, extra_routing_rules))
-    if not parsed_candidates:
+    fail_config = strip_balancer_for_empty(create_config_template(remarks_fail))
+    if not parsed_candidates and not reserve_candidates:
         return fail_config, []
 
-    if use_ping:
+    if use_ping and parsed_candidates:
         rtt_map = await ping_candidates(parsed_candidates)
         alive = [Candidate(p.outbound, p.remarks, p.address, p.port,
                            rtt_map[(p.address, p.port)], source_name)
                  for p in parsed_candidates if rtt_map.get((p.address, p.port)) is not None]
     else:
-        # Как в старых рабочих версиях: без пинга, клиент сам выберет с телефона
-        log("   ⏭️ Без пинга — проверку оставлю балансировщику клиента")
         alive = [Candidate(p.outbound, p.remarks, p.address, p.port, 0.0, source_name)
                  for p in parsed_candidates]
 
-    log(f"   ✅ Alive: {len(alive)}")
-    if not alive:
-        return fail_config, []
+    if use_ping:
+        alive.sort(key=lambda c: c.rtt)
 
-    alive.sort(key=lambda c: c.rtt)
     best = alive[:max_servers]
     used_addrs = {(c.address, c.port) for c in best}
 
-    # Добор из резерва: резервные сохраняют СВОЁ имя источника (например LTE-3)
-    if reserve_candidates:
+    # Добор из резерва
+    if reserve_candidates and len(best) < max_servers:
         added = 0
-        for c in sorted(reserve_candidates, key=lambda c: c.rtt):
+        sorted_reserve = sorted(reserve_candidates, key=lambda c: c.rtt) if use_ping else reserve_candidates
+        for c in sorted_reserve:
             if len(best) >= max_servers: break
             if (c.address, c.port) in used_addrs: continue
             if reserve_filter is not None and not reserve_filter(c): continue
@@ -760,10 +683,9 @@ async def check_and_create_balancer(
             added += 1
         if added: log(f"   ➕ Added from reserve: {added}")
 
-    src_count: Dict[str, int] = {}
-    for c in best: src_count[c.source] = src_count.get(c.source, 0) + 1
-    for src, cnt in src_count.items(): log(f"   📍 {src}: {cnt}")
     log(f"   🏆 Final: {len(best)}")
+    if not best:
+        return fail_config, []
 
     outbounds, tags = [], []
     for idx, cand in enumerate(best, start=1):
@@ -773,7 +695,7 @@ async def check_and_create_balancer(
         outbounds.append(ob_copy)
         tags.append(tag)
 
-    config = create_config_template(remarks_ok_template.format(count=len(best)), extra_routing_rules)
+    config = create_config_template(remarks_ok_template.format(count=len(best)))
     config["outbounds"] = outbounds + [
         {"protocol": "freedom", "settings": {"domainStrategy": "UseIPv4"}, "tag": "direct"},
         {"protocol": "blackhole", "settings": {"response": {"type": "http"}}, "tag": "block"},
@@ -782,8 +704,6 @@ async def check_and_create_balancer(
     config["burstObservatory"]["subjectSelector"] = tags
     return config, alive
 
-
-# ===== ПЛАТНАЯ ПОДПИСКА (без сортировки — как приходит) =====
 def _extract_server_from_dict(item):
     address = item.get("server") or item.get("address") or item.get("host")
     port = item.get("port") or item.get("port_number")
@@ -793,14 +713,11 @@ def _extract_server_from_dict(item):
                 "remarks": item.get("remarks") or item.get("name") or ""}
     return None
 
-
 def _filter_paid_configs(configs):
-    """Только выкидываем НАШИ сгенерированные маркеры, порядок НЕ трогаем."""
     exclude_markers = ("🏳️", "🏴", "📦", "✅", "⛔")
     filtered = [c for c in configs if not any(m in c.get("remarks", "") for m in exclude_markers)]
     log(f"📊 После фильтрации осталось {len(filtered)} платных конфигов")
     return filtered
-
 
 async def load_paid_subscription() -> List[Dict[str, Any]]:
     if not PAID_SUB_URL:
@@ -872,6 +789,17 @@ async def load_paid_subscription() -> List[Dict[str, Any]]:
         log_err("⚠️ Не удалось распарсить ссылки")
     return []
 
+def extract_used_keys(config: dict, used_keys_set: set):
+    """Извлекает (address, port) серверов из созданного конфига."""
+    for ob in config.get("outbounds", []):
+        if ob.get("protocol") in ("vless", "vmess") and "settings" in ob and "vnext" in ob["settings"]:
+            vnext = ob["settings"]["vnext"]
+            if vnext:
+                used_keys_set.add((vnext[0]["address"], vnext[0]["port"]))
+        elif ob.get("protocol") in ("trojan", "shadowsocks") and "settings" in ob and "servers" in ob["settings"]:
+            srvs = ob["settings"]["servers"]
+            if srvs:
+                used_keys_set.add((srvs[0]["address"], srvs[0]["port"]))
 
 # ===== MAIN =====
 async def main_async():
@@ -886,29 +814,36 @@ async def main_async():
     log(f"Найдено ссылок: белые={len(white_links)}, чёрные={len(black_links)}, extra={len(extra_links)}")
 
     def parse_all(links):
-        # hysteria2 и прочие неподдерживаемые xray-core схемы отсеиваются
-        # автоматически: для них просто нет обработчика в PROTOCOL_REGISTRY,
-        # и parse_proxy_url вернёт None.
         return [p for link in links if (p := parse_proxy_url(link)) is not None]
 
     white_parsed = parse_all(white_links)
     black_parsed = parse_all(black_links)
     extra_parsed = parse_all(extra_links)
 
-    # 🏳️LTE-3: extra, но ТОЛЬКО с РУ-SNI (иначе оператор не пропустит на LTE),
-    # с пингом. Его живые пойдут в резерв для LTE-1/LTE-2
-    lte3_parsed = [p for p in extra_parsed if is_lte_compatible(p)]
-    log(f"📱 LTE-3: extra с РУ-SNI: {len(lte3_parsed)}")
-    config_lte3, alive_lte3 = await check_and_create_balancer(
-        lte3_parsed, "LTE-3", MAX_LTE3,
-        remarks_ok_template="🏳️LTE-3 ✅ {count}",
-        remarks_fail="🏳️LTE-3 ⛔ Временно не работает",
-    )
+    # Объединяем белые и чёрные списки в общий пул основных ссылок
+    main_parsed = white_parsed + black_parsed
 
-    # 🏳️LTE-1: ПОСЛЕДНИЙ ШАНС. Все igareck с РУ-SNI, ЛЮБЫЕ регионы (включая РФ/РБ —
-    # оператор пропускает по белому SNI). Без пинга, добор РУ-SNI из живых LTE-3.
-    lte1_parsed = [p for p in white_parsed if is_lte_compatible(p)]
-    log(f"📱 LTE-1: igareck с РУ-SNI (все регионы): {len(lte1_parsed)}")
+    # 1. Готовим кандидатов для LTE-3 (extra/goida) и пингуем их
+    lte3_parsed = [p for p in extra_parsed if is_lte_compatible(p)]
+    log(f"📱 LTE-3 резерв: extra с РУ-SNI: {len(lte3_parsed)}")
+    
+    if lte3_parsed:
+        rtt_map_lte3 = await ping_candidates(lte3_parsed)
+        alive_lte3 = [Candidate(p.outbound, p.remarks, p.address, p.port,
+                                rtt_map_lte3[(p.address, p.port)], "LTE-3")
+                      for p in lte3_parsed if rtt_map_lte3.get((p.address, p.port)) is not None]
+        alive_lte3.sort(key=lambda c: c.rtt)
+    else:
+        alive_lte3 = []
+
+    used_keys = set()  # Хранит пары (address, port) уже задействованных серверов
+
+    # ---------------------------------------------------------
+    # 🏳️LTE-1: Абсолютно все конфиги из ссылок (до MAX_LTE1) + добор из LTE-3
+    # ---------------------------------------------------------
+    lte1_parsed = [p for p in main_parsed if is_lte_compatible(p)]
+    log(f"📱 LTE-1: кандидатов из основных ссылок: {len(lte1_parsed)}")
+
     config_lte1, _ = await check_and_create_balancer(
         lte1_parsed, "LTE-1", MAX_LTE1,
         remarks_ok_template="🏳️LTE-1 ✅ {count}",
@@ -917,33 +852,86 @@ async def main_async():
         reserve_filter=lambda c: is_lte_compatible(c),
         use_ping=False,
     )
+    extract_used_keys(config_lte1, used_keys)
 
-    # 🏳️LTE-2(no-ru): РУ-SNI + НЕ РФ/РБ по remarks (минимизируем подключение
-    # к России/Беларуси, где блочат). Без пинга, добор из LTE-3 с теми же фильтрами.
-    lte2_parsed = [p for p in white_parsed
-                   if is_lte_compatible(p) and not is_excluded_region(p.remarks)]
-    log(f"📱 LTE-2: igareck с РУ-SNI и НЕ РФ/РБ: {len(lte2_parsed)}")
+    # ---------------------------------------------------------
+    # 🏳️LTE-2(no-ru): Новые конфиги без РФ/РБ (исключая всё, что ушло в LTE-1)
+    # ---------------------------------------------------------
+    lte2_parsed = [
+        p for p in main_parsed
+        if is_lte_compatible(p)
+        and not is_excluded_region(p.remarks)
+        and (p.address, p.port) not in used_keys
+    ]
+    log(f"📱 LTE-2: новых кандидатов без РФ/РБ: {len(lte2_parsed)}")
+
     config_lte2, _ = await check_and_create_balancer(
         lte2_parsed, "LTE-2", MAX_LTE2,
         remarks_ok_template="🏳️LTE-2(no-ru) ✅ {count}",
         remarks_fail="🏳️LTE-2(no-ru) ⛔ Временно не работает",
         reserve_candidates=alive_lte3,
-        reserve_filter=lambda c: is_lte_compatible(c) and not is_excluded_region(c.remarks),
+        reserve_filter=lambda c: is_lte_compatible(c)
+                            and not is_excluded_region(c.remarks)
+                            and (c.address, c.port) not in used_keys,
         use_ping=False,
     )
+    extract_used_keys(config_lte2, used_keys)
 
-    # 🏴Wi-Fi-1: чёрный список, только для вайфая, с пингом.
-    # Плюс: вся зона .ru уходит напрямую, минуя VPN (WIFI_EXTRA_RULES).
-    config_wifi1, _ = await check_and_create_balancer(
-        black_parsed, "Wi-Fi-1", MAX_WIFI,
-        remarks_ok_template="🏴Wi-Fi-1 ✅ {count}",
-        remarks_fail="🏴Wi-Fi-1 ⛔ Временно не работает",
-        extra_routing_rules=WIFI_EXTRA_RULES,
+    # ---------------------------------------------------------
+    # 🏳️LTE-3: Оставшиеся из резерва (до MAX_LTE3)
+    # ---------------------------------------------------------
+    lte3_candidates = [
+        ParsedProxy(c.outbound, c.remarks, c.address, c.port)
+        for c in alive_lte3
+        if (c.address, c.port) not in used_keys
+    ]
+    log(f"📱 LTE-3: свободных серверов резерва: {len(lte3_candidates)}")
+
+    config_lte3, _ = await check_and_create_balancer(
+        lte3_candidates, "LTE-3", MAX_LTE3,
+        remarks_ok_template="🏳️LTE-3 ✅ {count}",
+        remarks_fail="🏳️LTE-3 ⛔ Временно не работает",
+        use_ping=True,
     )
+    extract_used_keys(config_lte3, used_keys)
 
-    final_configs = [config_lte1, config_lte2, config_lte3, config_wifi1] + paid_configs
+    generated_lte_configs = [config_lte1, config_lte2, config_lte3]
 
-    # Запись только в subscription.json (subscription.txt удалён)
+    # ---------------------------------------------------------
+    # 🏳️LTE-4, 🏳️LTE-5...: Динамические чанки для всех оставшихся серверов
+    # ---------------------------------------------------------
+    all_parsed_combined = main_parsed + extra_parsed
+    remaining_parsed = []
+    seen_rem = set()
+    for p in all_parsed_combined:
+        key = (p.address, p.port)
+        if key not in used_keys and key not in seen_rem:
+            seen_rem.add(key)
+            remaining_parsed.append(p)
+
+    log(f"\n📦 Осталось неиспользованных серверов для доп. чанков: {len(remaining_parsed)}")
+
+    extra_chunk_num = 4
+    while remaining_parsed and (extra_chunk_num - 3) <= MAX_EXTRA_CHUNKS:
+        chunk_candidates = remaining_parsed[:EXTRA_CHUNK_SIZE]
+        remaining_parsed = remaining_parsed[EXTRA_CHUNK_SIZE:]
+        
+        chunk_tag = f"LTE-{extra_chunk_num}"
+        log(f"📦 Создаём чанк 🏳️{chunk_tag} (серверов: {len(chunk_candidates)})")
+        
+        cfg_extra, _ = await check_and_create_balancer(
+            chunk_candidates, chunk_tag, EXTRA_CHUNK_SIZE,
+            remarks_ok_template=f"🏳️{chunk_tag} ✅ {{count}}",
+            remarks_fail=f"🏳️{chunk_tag} ⛔ Временно не работает",
+            use_ping=False,
+        )
+        extract_used_keys(cfg_extra, used_keys)
+        generated_lte_configs.append(cfg_extra)
+        extra_chunk_num += 1
+
+    final_configs = generated_lte_configs + paid_configs
+
+    # Запись в файл подписки
     with open("subscription.json", "w", encoding="utf-8") as f:
         json.dump(final_configs, f, indent=2, ensure_ascii=False)
 
@@ -951,13 +939,11 @@ async def main_async():
         return len(cfg.get("routing", {}).get("balancers", [{}])[0].get("selector", []))
 
     log("\n✅ Успешно обновлено!")
-    log(f"   • 🏳️LTE-1: {selector_len(config_lte1)} серверов")
-    log(f"   • 🏳️LTE-2(no-ru): {selector_len(config_lte2)} серверов")
-    log(f"   • 🏳️LTE-3: {selector_len(config_lte3)} серверов")
-    log(f"   • 🏴Wi-Fi-1: {selector_len(config_wifi1)} серверов")
+    for cfg in generated_lte_configs:
+        rm = cfg.get("remarks", "Без названия")
+        log(f"   • {rm}: {selector_len(cfg)} серверов")
     log(f"   • Платных конфигов: {len(paid_configs)} (без сортировки)")
     log(f"   • Всего записей: {len(final_configs)}")
-
 
 def main():
     try:
@@ -970,7 +956,6 @@ def main():
         import traceback
         log_err(traceback.format_exc())
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
