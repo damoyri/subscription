@@ -21,11 +21,6 @@ from datetime import datetime, timedelta, timezone
 
 # ===== КОНФИГУРАЦИЯ =====
 PAID_SUB_URL = os.environ.get("PAID_SUB_URL", "")
-PAID_SUB_URL_2 = os.environ.get("PAID_SUB_URL_2", "")   # вторая подписка
-
-# Максимальное количество дополнительных конфигов (файлов) для LTE и Wi-Fi
-MAX_EXTRA_LTE_CONFIGS = int(os.environ.get("MAX_EXTRA_LTE_CONFIGS", "5"))
-MAX_EXTRA_WIFI_CONFIGS = int(os.environ.get("MAX_EXTRA_WIFI_CONFIGS", "5"))
 
 WHITE_URLS = [
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt",
@@ -33,6 +28,7 @@ WHITE_URLS = [
 ]
 BLACK_URLS = [
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/BLACK_VLESS_RUS_mobile.txt",
+    "https://github.com/AvenCores/goida-vpn-configs/raw/refs/heads/main/githubmirror/1.txt",
 ]
 EXTRA_URLS = [
     "https://github.com/AvenCores/goida-vpn-configs/raw/refs/heads/main/githubmirror/26.txt",
@@ -183,11 +179,7 @@ def _is_ip(s: str) -> bool:
         return False
 
 def is_lte_compatible(p) -> bool:
-    """
-    Живёт ли конфиг на LTE: смотрим SNI в reality/tls.
-    Расширено: любой SNI, оканчивающийся на .ru, считается совместимым,
-    т.к. оператор пропускает такие домены (в том числе и не из белого списка).
-    """
+    """Живёт ли конфиг на LTE: смотрим SNI в reality/tls."""
     stream = p.outbound.get("streamSettings", {})
     sni = ""
     if stream.get("security") == "reality":
@@ -197,13 +189,7 @@ def is_lte_compatible(p) -> bool:
     if not sni:
         return False
     sni = sni.lower()
-    # Проверка по белому списку
-    if any(sni == d or sni.endswith("." + d) for d in LTE_SNI_WHITELIST):
-        return True
-    # Дополнительно: любой .ru домен считается совместимым для LTE
-    if sni.endswith(".ru"):
-        return True
-    return False
+    return any(sni == d or sni.endswith("." + d) for d in LTE_SNI_WHITELIST)
 
 
 async def fetch_url(url, timeout=15.0):
@@ -490,6 +476,7 @@ class TrojanHandler(ProtocolHandler):
                 stream["wsSettings"] = ws
             elif network == "grpc":
                 stream["grpcSettings"] = {"serviceName": params.get("serviceName", "")}
+            # allowInsecure удалён, так как в новых версиях Xray он запрещён
             stream["tlsSettings"] = {
                 "serverName": params.get("sni", address),
                 "fingerprint": clean_fingerprint(params.get("fingerprint")),
@@ -522,6 +509,7 @@ class TrojanHandler(ProtocolHandler):
                 if svc: params["serviceName"] = svc
             if t.get("serverName"): params["sni"] = t["serverName"]
             if t.get("fingerprint"): params["fp"] = t["fingerprint"]
+            # allowInsecure не добавляем
             url = f"trojan://{password}@{bracket_if_ipv6(address)}:{port}"
             if params: url += "?" + "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items())
             if remarks: url += "#" + urllib.parse.quote(remarks)
@@ -774,41 +762,30 @@ async def check_and_create_balancer(
     """
     log(f"\n🔍 Checking source: {source_name} (total {len(parsed_candidates)})")
     fail_config = strip_balancer_for_empty(create_config_template(remarks_fail, extra_routing_rules))
-    
-    alive = []
-    if parsed_candidates:
-        if use_ping:
-            rtt_map = await ping_candidates(parsed_candidates)
-            alive = [Candidate(p.outbound, p.remarks, p.address, p.port,
-                               rtt_map[(p.address, p.port)], source_name)
-                     for p in parsed_candidates if rtt_map.get((p.address, p.port)) is not None]
-        else:
-            log("   ⏭️ Без пинга — проверку оставлю балансировщику клиента")
-            alive = [Candidate(p.outbound, p.remarks, p.address, p.port, 0.0, source_name)
-                     for p in parsed_candidates]
-    
-    # Если нет живых из основного источника, но есть резерв, используем резерв
-    if not alive and reserve_candidates:
-        log(f"   ⚠️ Нет живых из {source_name}, используем резерв")
-        # Фильтруем резерв
-        if reserve_filter:
-            reserve_filtered = [c for c in reserve_candidates if reserve_filter(c)]
-        else:
-            reserve_filtered = reserve_candidates
-        if reserve_filtered:
-            alive = reserve_filtered[:]  # берём все, потом ограничим max_servers
-    
+    if not parsed_candidates:
+        return fail_config, [], []
+
+    if use_ping:
+        rtt_map = await ping_candidates(parsed_candidates)
+        alive = [Candidate(p.outbound, p.remarks, p.address, p.port,
+                           rtt_map[(p.address, p.port)], source_name)
+                 for p in parsed_candidates if rtt_map.get((p.address, p.port)) is not None]
+    else:
+        # Без пинга — все считаются живыми (rtt=0)
+        log("   ⏭️ Без пинга — проверку оставлю балансировщику клиента")
+        alive = [Candidate(p.outbound, p.remarks, p.address, p.port, 0.0, source_name)
+                 for p in parsed_candidates]
+
+    log(f"   ✅ Alive: {len(alive)}")
     if not alive:
-        log(f"   ❌ Нет живых серверов для {source_name}")
         return fail_config, [], []
 
     alive.sort(key=lambda c: c.rtt)
     best = alive[:max_servers]
     used_addrs = {(c.address, c.port) for c in best}
 
-    # Добор из резерва (если уже взяли из резерва, то ничего не добавляем, т.к. уже взяли все, что есть)
-    # Но если alive содержал какие-то из основного, можно добирать из резерва
-    if reserve_candidates and len(best) < max_servers:
+    # Добор из резерва (резервные серверы уже имеют свои RTT)
+    if reserve_candidates:
         added = 0
         for c in sorted(reserve_candidates, key=lambda c: c.rtt):
             if len(best) >= max_servers: break
@@ -824,6 +801,7 @@ async def check_and_create_balancer(
     for src, cnt in src_count.items(): log(f"   📍 {src}: {cnt}")
     log(f"   🏆 Final: {len(best)}")
 
+    # Формируем remarks с временной меткой
     if omsk_time is None:
         omsk_time = get_omsk_time_str()
     ok_remarks = f"{remarks_ok_template.format(count=len(best))} | ⏱ {omsk_time}"
@@ -897,11 +875,28 @@ def _filter_paid_configs(configs):
     log(f"📊 После фильтрации осталось {len(filtered)} платных конфигов")
     return filtered
 
-# ===== НОВАЯ ФУНКЦИЯ ДЛЯ ПАРСИНГА ОДНОЙ ПОДПИСКИ =====
-async def parse_paid_data(raw_data: str, omsk_time: str) -> List[Dict]:
-    """Парсит сырые данные подписки (JSON или ссылки) и возвращает список готовых конфигов."""
+
+async def load_paid_subscription(omsk_time):
+    if not PAID_SUB_URL:
+        log_err("⚠️ PAID_SUB_URL не задан")
+        return []
+    raw = await fetch_url(PAID_SUB_URL)
+
+    if not raw:
+        log("⚠️ Не удалось загрузить подписку, восстанавливаем из subscription.json...")
+        try:
+            with open("subscription.json", "r", encoding="utf-8") as f:
+                old = json.load(f)
+            if isinstance(old, list):
+                paid_only = _filter_paid_configs(old)
+                log(f"🔄 Восстановлено {len(paid_only)} платных конфигов")
+                return paid_only
+        except Exception as e:
+            log_err(f"⚠️ Ошибка чтения subscription.json: {e}")
+        return []
+
     try:
-        data = json.loads(raw_data)
+        data = json.loads(raw)
         if isinstance(data, list):
             ready, obs = [], []
             for item in data:
@@ -918,6 +913,7 @@ async def parse_paid_data(raw_data: str, omsk_time: str) -> List[Dict]:
                                 "settings": {"servers": [{"address": srv["address"], "port": srv["port"]}]},
                                 "remarks": srv["remarks"]}, srv["remarks"]))
             if ready:
+                # Добавляем время к уже готовым конфигам
                 for cfg in ready:
                     old_rem = cfg.get("remarks", "Платная подписка")
                     cfg["remarks"] = f"{old_rem} | ⏱ {omsk_time}"
@@ -925,6 +921,7 @@ async def parse_paid_data(raw_data: str, omsk_time: str) -> List[Dict]:
             if obs:
                 return _filter_paid_configs(
                     [create_single_outbound_config(ob, rm or ob.get("remarks", ""), omsk_time) for ob, rm in obs])
+            log_err("⚠️ Не удалось распознать элементы списка")
         elif isinstance(data, dict):
             if "outbounds" in data and "routing" in data:
                 old_rem = data.get("remarks", "Платная подписка")
@@ -942,41 +939,21 @@ async def parse_paid_data(raw_data: str, omsk_time: str) -> List[Dict]:
                     "protocol": srv["protocol"],
                     "settings": {"servers": [{"address": srv["address"], "port": srv["port"]}]},
                     "remarks": srv["remarks"]}, srv["remarks"], omsk_time)])
+            log_err("⚠️ Неизвестный формат JSON")
+        else:
+            log_err("⚠️ Неожиданный тип JSON")
     except json.JSONDecodeError:
-        # Пробуем как base64 или просто ссылки
         try:
-            decoded = base64.b64decode(raw_data).decode("utf-8")
+            decoded = base64.b64decode(raw).decode("utf-8")
         except Exception:
-            decoded = raw_data
+            decoded = raw
         items = [(pp.outbound, pp.remarks) for line in decoded.splitlines()
                  if line.strip() and (pp := parse_proxy_url(line))]
         if items:
             return _filter_paid_configs(
                 [create_single_outbound_config(ob, rm or ob.get("remarks", ""), omsk_time) for ob, rm in items])
+        log_err("⚠️ Не удалось распарсить ссылки")
     return []
-
-
-# ===== ОБНОВЛЁННАЯ ФУНКЦИЯ ЗАГРУЗКИ ПЛАТНОЙ ПОДПИСКИ (несколько URL) =====
-async def load_paid_subscription(omsk_time):
-    urls = [PAID_SUB_URL, PAID_SUB_URL_2]
-    urls = [u.strip() for u in urls if u.strip()]
-    if not urls:
-        log_err("⚠️ PAID_SUB_URL не задан")
-        return []
-
-    all_configs = []
-    for url in urls:
-        log(f"📥 Загрузка платной подписки: {url}")
-        raw = await fetch_url(url)
-        if not raw:
-            log(f"⚠️ Не удалось загрузить {url}, пропускаем")
-            continue
-        parsed = await parse_paid_data(raw, omsk_time)
-        if parsed:
-            all_configs.extend(parsed)
-
-    # Фильтруем, чтобы исключить наши автоматические маркеры (уже сделано внутри parse_paid_data, но на всякий случай)
-    return _filter_paid_configs(all_configs)
 
 
 # ===== MAIN =====
@@ -1010,29 +987,25 @@ async def main_async():
         omsk_time=omsk_time,
     )
 
-    # 🏳️LTE-1: ПОСЛЕДНИЙ ШАНС. Сначала фильтруем по РУ-SNI.
+    # 🏳️LTE-1: ПОСЛЕДНИЙ ШАНС. Все igareck с РУ-SNI, ЛЮБЫЕ регионы (включая РФ/РБ —
+    # оператор пропускает по белому SNI). Без пинга, добор РУ-SNI из живых LTE-3.
     lte1_parsed = [p for p in white_parsed if is_lte_compatible(p)]
-    if not lte1_parsed:
-        log("⚠️ Нет конфигов с РУ-SNI среди белых, беру все белые без фильтрации SNI для LTE-1")
-        lte1_parsed = white_parsed[:]  # все, без фильтрации
-    log(f"📱 LTE-1: igareck (все регионы): {len(lte1_parsed)}")
+    log(f"📱 LTE-1: igareck с РУ-SNI (все регионы): {len(lte1_parsed)}")
     config_lte1, _, selected_lte1 = await check_and_create_balancer(
         lte1_parsed, "LTE-1", MAX_LTE1,
         remarks_ok_template="🏳️LTE-1 ✅ {count}",
         remarks_fail="🏳️LTE-1 ⛔ Временно не работает",
         reserve_candidates=alive_lte3,
-        reserve_filter=lambda c: is_lte_compatible(c),  # резерв только с РУ-SNI
+        reserve_filter=lambda c: is_lte_compatible(c),
         use_ping=False,
         omsk_time=omsk_time,
     )
 
-    # 🏳️LTE-2(no-ru): РУ-SNI + НЕ РФ/РБ
+    # 🏳️LTE-2(no-ru): РУ-SNI + НЕ РФ/РБ по remarks (минимизируем подключение
+    # к России/Беларуси, где блочат). Без пинга, добор из LTE-3 с теми же фильтрами.
     lte2_parsed = [p for p in white_parsed
                    if is_lte_compatible(p) and not is_excluded_region(p.remarks)]
-    if not lte2_parsed:
-        log("⚠️ Нет конфигов с РУ-SNI и без РФ/РБ, беру все белые без фильтрации SNI, но исключая РФ/РБ для LTE-2")
-        lte2_parsed = [p for p in white_parsed if not is_excluded_region(p.remarks)]
-    log(f"📱 LTE-2: igareck (не РФ/РБ): {len(lte2_parsed)}")
+    log(f"📱 LTE-2: igareck с РУ-SNI и НЕ РФ/РБ: {len(lte2_parsed)}")
     config_lte2, _, selected_lte2 = await check_and_create_balancer(
         lte2_parsed, "LTE-2", MAX_LTE2,
         remarks_ok_template="🏳️LTE-2(no-ru) ✅ {count}",
@@ -1076,9 +1049,7 @@ async def main_async():
 
     # Создаём дополнительные конфиги (LTE-4, LTE-5, ...)
     extra_lte_configs = generate_chunked_configs(remaining_lte, "LTE", "🏳️", omsk_time=omsk_time)
-    # Ограничиваем количество файлов
-    extra_lte_configs = extra_lte_configs[:MAX_EXTRA_LTE_CONFIGS]
-    log(f"   Создано {len(extra_lte_configs)} дополнительных LTE-конфигов (макс. {MAX_EXTRA_LTE_CONFIGS})")
+    log(f"   Создано {len(extra_lte_configs)} дополнительных LTE-конфигов")
 
     # 2. Для Wi-Fi: берём все чёрные, исключаем использованные в Wi-Fi-1
     used_wifi = {(c.address, c.port) for c in selected_wifi1}
@@ -1087,8 +1058,7 @@ async def main_async():
     log(f"\n📱 Дополнительные Wi-Fi: осталось {len(remaining_wifi)} неиспользованных живых серверов")
 
     extra_wifi_configs = generate_chunked_configs(remaining_wifi, "Wi-Fi", "🏴", extra_rules=WIFI_EXTRA_RULES, omsk_time=omsk_time)
-    extra_wifi_configs = extra_wifi_configs[:MAX_EXTRA_WIFI_CONFIGS]
-    log(f"   Создано {len(extra_wifi_configs)} дополнительных Wi-Fi-конфигов (макс. {MAX_EXTRA_WIFI_CONFIGS})")
+    log(f"   Создано {len(extra_wifi_configs)} дополнительных Wi-Fi-конфигов")
 
     # Финальный список: основные + дополнительные + платные
     final_configs = [config_lte1, config_lte2, config_lte3, config_wifi1] + extra_lte_configs + extra_wifi_configs + paid_configs
