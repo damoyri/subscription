@@ -1,0 +1,35 @@
+name: Auto Update Subscription Worker
+
+on:
+  schedule:
+    # Запуск каждые 30 минут (можно изменить cron при необходимости)
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Кнопка для ручного запуска из GitHub Actions
+
+jobs:
+  update-subscription:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Чекaут репозитория
+        uses: actions/checkout@v4
+
+      - name: Настройка Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Запуск воркера обновления
+        run: python update_raw_sub.py
+
+      - name: Сохранение и пуш изменений
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add subscription.json
+          if git diff --staged --quiet; then
+            echo "Новых конфигов нет, файл не изменился."
+          else
+            git commit -m "auto: обновление конфигов в subscription.json"
+            git push
+          fi
