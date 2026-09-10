@@ -1,4 +1,4 @@
-name: Build Config with Balancer
+name: Balancer
 
 on:
   schedule:
