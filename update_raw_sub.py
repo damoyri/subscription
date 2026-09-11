@@ -4,7 +4,7 @@ import sys
 import urllib.request
 
 # ================= НАСТРОЙКИ =================
-MAX_CONFIGS = 500  # Максимальное количество конфигов
+MAX_CONFIGS = 1000  # Максимальное количество конфигов
 OUTPUT_FILE = "subscription.json"  # Итоговый файл со ссылками
 
 URLS = [
