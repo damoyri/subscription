@@ -4,12 +4,13 @@ import sys
 import urllib.request
 
 # ================= НАСТРОЙКИ =================
-MAX_CONFIGS = 200  # Максимальное количество конфигов
+MAX_CONFIGS = 500  # Максимальное количество конфигов
 OUTPUT_FILE = "subscription.json"  # Итоговый файл со ссылками
 
 URLS = [
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-CIDR-RU-all.txt",
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt",
+    "https://github.com/AvenCores/goida-vpn-configs/raw/refs/heads/main/githubmirror/26.txt",
 ]
 # =============================================
 
