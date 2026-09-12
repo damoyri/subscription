@@ -2,17 +2,24 @@ name: Auto Update Subscription Worker
 
 on:
   schedule:
-    # Запуск каждые 30 минут (можно изменить cron при необходимости)
     - cron: '*/30 * * * *'
-  workflow_dispatch: # Кнопка для ручного запуска из GitHub Actions
+  workflow_dispatch:
 
 jobs:
   update-subscription:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
-      - name: Чекaут репозитория
+      - name: Чекаут репозитория
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Настройка Python
         uses: actions/setup-python@v5
@@ -22,7 +29,7 @@ jobs:
       - name: Запуск воркера обновления
         run: python update_raw_sub.py
 
-      - name: Сохранение и пуш изменений
+      - name: Сохранение и пуш изменений в GitHub
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
@@ -31,5 +38,27 @@ jobs:
             echo "Новых конфигов нет, файл не изменился."
           else
             git commit -m "auto: обновление конфигов в subscription.json"
-            git push
+            git pull --rebase origin main || echo "Rebase done"
+            git push origin main
           fi
+
+      - name: Push to Bitbucket (SSH)
+        env:
+          BITBUCKET_SSH_PRIVATE_KEY: ${{ secrets.BITBUCKET_SSH_PRIVATE_KEY }}
+        run: |
+          if [ -z "$BITBUCKET_SSH_PRIVATE_KEY" ]; then
+            echo "Bitbucket SSH key not set, skipping"
+            exit 0
+          fi
+
+          mkdir -p ~/.ssh
+          echo "$BITBUCKET_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
+
+          if ! git remote get-url bitbucket > /dev/null 2>&1; then
+            git remote add bitbucket git@bitbucket.org:damoyri/subscription.git
+          fi
+
+          git push --force --all bitbucket
+          git push --force --tags bitbucket
