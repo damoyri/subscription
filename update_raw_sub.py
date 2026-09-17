@@ -203,9 +203,9 @@ def main():
     print(f"Работающих через Xray: {len(working)}")
 
     if working:
-        with open("working_vless.txt", "w", encoding="utf-8") as f:
+        with open("subscription.json", "w", encoding="utf-8") as f:
             f.write("\n".join(working))
-        print("Сохранено в файл: working_vless.txt")
+        print("Сохранено в файл: subscription.json")
 
 if __name__ == "__main__":
     main()
