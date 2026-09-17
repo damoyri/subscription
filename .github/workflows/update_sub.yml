@@ -27,6 +27,15 @@ jobs:
       - name: Запуск воркера обновления
         run: python update_raw_sub.py
 
+      - name: Загрузка отчёта по мёртвым конфигам
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dead-configs
+          path: dead.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
       - name: Сохранение и пуш изменений в GitHub
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -35,7 +44,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "Новых конфигов нет, файл не изменился."
           else
-            git commit -m "auto: обновление конфигов в subscription.json"
+            git commit -m "auto: обновление рабочих конфигов в subscription.json"
             git pull --rebase origin main || echo "Rebase done"
             git push origin main
           fi
