@@ -2,6 +2,8 @@ name: Auto Update Subscription Worker
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'   # каждые 6 часов
 
 jobs:
   update-subscription:
@@ -43,11 +45,25 @@ jobs:
           git add subscription.json
           if git diff --staged --quiet; then
             echo "Новых конфигов нет, файл не изменился."
-          else
-            git commit -m "auto: обновление рабочих конфигов в subscription.json"
-            git pull --rebase origin main || echo "Rebase done"
-            git push origin main
+            exit 0
           fi
+          git commit -m "auto: обновление рабочих конфигов в subscription.json"
+
+          for i in 1 2 3 4 5; do
+            if git push origin main; then
+              echo "Запушено"
+              break
+            fi
+            echo "Пуш отклонён (гонка с другим запуском), пробуем снова ($i/5)..."
+            git fetch origin main
+            # Наш subscription.json всегда свежесгенерирован — при конфликте просто берём его версию,
+            # построчный мерж автогенерируемого файла не имеет смысла.
+            git rebase -X ours origin/main
+            if [ "$i" -eq 5 ]; then
+              echo "Не удалось запушить после 5 попыток"
+              exit 1
+            fi
+          done
 
       - name: Push to Bitbucket (SSH)
         env:
