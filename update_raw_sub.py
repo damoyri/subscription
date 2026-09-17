@@ -32,7 +32,8 @@ KEEP_UDP_PROTOCOLS = True     # hysteria2/tuic/wireguard: TCP-проверить
 URLS = [
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-CIDR-RU-all.txt",
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt",
-    "https://github.com/AvenCores/goida-vpn-configs/raw/refs/heads/main/githubmirror/26.txt",
+    "https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_universal.txt",
+    "https://etoneya.su/whitelist"
 ]
 
 UDP_SCHEMES = {"hysteria", "hysteria2", "hy2", "tuic", "wireguard", "warp"}
