@@ -7,6 +7,7 @@
 import base64
 import json
 import os
+import re
 import socket
 import ssl
 import sys
@@ -19,7 +20,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 MAX_CONFIGS = 1000            # сколько конфигов оставить в итоге
 OUTPUT_FILE = "subscription.json"
 DEAD_FILE = "dead.txt"        # куда сложить отбракованные (для отладки), "" — не писать
-
 CHECK_ENABLED = True          # включить проверку живости
 CONNECT_TIMEOUT = 4.0         # таймаут TCP-коннекта, сек
 TLS_TIMEOUT = 5.0             # таймаут TLS-handshake, сек
@@ -28,17 +28,14 @@ MAX_LATENCY_MS = 2500         # отбрасывать слишком медле
 SORT_BY_LATENCY = True        # быстрые конфиги наверх
 DEDUP_BY_SERVER = False       # True = не больше одного конфига на host:port
 KEEP_UDP_PROTOCOLS = True     # hysteria2/tuic/wireguard: TCP-проверить нельзя, оставлять как есть
-
 URLS = [
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-CIDR-RU-all.txt",
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-SNI-RU-all.txt",
     "https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_universal.txt",
     "https://etoneya.su/whitelist"
 ]
-
 UDP_SCHEMES = {"hysteria", "hysteria2", "hy2", "tuic", "wireguard", "warp"}
 # =============================================
-
 
 # ---------- загрузка ----------
 def is_valid_config(line: str) -> bool:
@@ -46,7 +43,6 @@ def is_valid_config(line: str) -> bool:
     if not line or line.startswith("#"):
         return False
     return "://" in line
-
 
 def fetch_url(url: str) -> list:
     try:
@@ -58,7 +54,6 @@ def fetch_url(url: str) -> list:
     except Exception as e:
         print(f"⚠️ Ошибка при скачивании {url}: {e}", file=sys.stderr)
         return []
-
     # источник может отдавать base64-подписку целиком
     stripped = "".join(content.split())
     if "://" not in content and len(stripped) > 40:
@@ -66,16 +61,13 @@ def fetch_url(url: str) -> list:
             content = b64decode(stripped).decode("utf-8", errors="ignore")
         except Exception:
             pass
-
     return [l.strip() for l in content.splitlines() if is_valid_config(l)]
-
 
 # ---------- парсинг ----------
 def b64decode(data: str) -> bytes:
     data = data.strip().replace("-", "+").replace("_", "/")
     data += "=" * (-len(data) % 4)
     return base64.b64decode(data)
-
 
 def parse_config(line: str):
     """
@@ -85,7 +77,6 @@ def parse_config(line: str):
     try:
         scheme = line.split("://", 1)[0].lower()
         rest = line.split("://", 1)[1]
-
         # ---- vmess: base64(json) ----
         if scheme == "vmess":
             raw = rest.split("#", 1)[0]
@@ -95,7 +86,6 @@ def parse_config(line: str):
             tls = str(cfg.get("tls", "")).lower() in ("tls", "reality", "true", "1")
             sni = cfg.get("sni") or cfg.get("host") or host
             return mk(scheme, host, port, tls, sni)
-
         # ---- ss: может быть base64 целиком ----
         if scheme in ("ss", "ssr") and "@" not in rest.split("#", 1)[0]:
             raw = rest.split("#", 1)[0]
@@ -105,7 +95,6 @@ def parse_config(line: str):
                 host, port = split_hostport(hostport)
                 return mk(scheme, host, port, False, None)
             return None
-
         # ---- остальное: uuid/pass@host:port?params#name ----
         u = urllib.parse.urlsplit(line)
         host = u.hostname
@@ -125,7 +114,6 @@ def parse_config(line: str):
     except Exception:
         return None
 
-
 def split_hostport(s: str):
     if s.startswith("["):  # IPv6
         host, _, port = s[1:].partition("]:")
@@ -133,12 +121,34 @@ def split_hostport(s: str):
     host, _, port = s.rpartition(":")
     return host, int(port)
 
-
 def mk(scheme, host, port, tls, sni):
     if not host or not port or port < 1 or port > 65535:
         return None
     return {"scheme": scheme, "host": host, "port": int(port), "tls": bool(tls), "sni": sni}
 
+def get_name(cfg: str) -> str:
+    try:
+        if cfg.lower().startswith("vmess://"):
+            raw = cfg.split("://", 1)[1].split("#", 1)[0]
+            return json.loads(b64decode(raw).decode("utf-8", errors="ignore")).get("ps", "")
+        if "#" in cfg:
+            return urllib.parse.unquote(cfg.split("#", 1)[1])
+    except Exception:
+        pass
+    return ""
+
+def name_key(cfg: str):
+    name = get_name(cfg)
+    low = name.lower()
+    # Россия — в самый конец
+    if "🇷🇺" in name or "russia" in low or "росси" in low:
+        return (2, "")
+    # остальные страны — по алфавиту кода флага
+    flags = re.findall("[\U0001F1E6-\U0001F1FF]{2}", name)
+    if flags:
+        return (0, flags[0])
+    # без флага (Unknown и т.п.) — между странами и Россией
+    return (1, low)
 
 # ---------- проверка живости ----------
 def check_alive(info: dict):
@@ -149,7 +159,6 @@ def check_alive(info: dict):
         sock = socket.create_connection((host, port), timeout=CONNECT_TIMEOUT)
     except Exception:
         return None
-
     latency = (time.perf_counter() - start) * 1000
     try:
         if info["tls"]:
@@ -161,8 +170,8 @@ def check_alive(info: dict):
             with ctx.wrap_socket(sock, server_hostname=info["sni"] or host) as ssock:
                 if ssock.version() not in ("TLSv1.2", "TLSv1.3"):
                     return None
-                latency = (time.perf_counter() - start) * 1000
-        return latency
+            latency = (time.perf_counter() - start) * 1000
+            return latency
     except Exception:
         return None
     finally:
@@ -171,11 +180,9 @@ def check_alive(info: dict):
         except Exception:
             pass
 
-
 def filter_alive(configs: list):
     alive, dead, skipped = [], [], []
     tasks = {}
-
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
         for cfg in configs:
             info = parse_config(cfg)
@@ -189,31 +196,32 @@ def filter_alive(configs: list):
                     dead.append((cfg, "udp-протокол, проверка невозможна"))
                 continue
             tasks[pool.submit(check_alive, info)] = cfg
-
-        done = 0
-        total = len(tasks)
-        for fut in as_completed(tasks):
-            cfg = tasks[fut]
-            done += 1
-            if done % 100 == 0:
-                print(f"   проверено {done}/{total}")
-            try:
-                latency = fut.result()
-            except Exception:
-                latency = None
-            if latency is None:
-                dead.append((cfg, "нет ответа"))
-            elif latency > MAX_LATENCY_MS:
-                dead.append((cfg, f"медленный {int(latency)} мс"))
-            else:
-                alive.append((latency, cfg))
-
+    
+    done = 0
+    total = len(tasks)
+    for fut in as_completed(tasks):
+        cfg = tasks[fut]
+        done += 1
+        if done % 100 == 0:
+            print(f"   проверено {done}/{total}")
+        try:
+            latency = fut.result()
+        except Exception:
+            latency = None
+        if latency is None:
+            dead.append((cfg, "нет ответа"))
+        elif latency > MAX_LATENCY_MS:
+            dead.append((cfg, f"медленный {int(latency)} мс"))
+        else:
+            alive.append((latency, cfg))
+            
     if SORT_BY_LATENCY:
         alive.sort(key=lambda x: x[0])
-
-    result = [cfg for _, cfg in alive] + skipped
+    
+    items = list(alive) + [(float("inf"), c) for c in skipped]
+    items.sort(key=lambda x: (name_key(x[1]), x[0]))
+    result = [cfg for _, cfg in items]
     return result, dead, alive
-
 
 def main():
     # 1. уже имеющиеся конфиги
@@ -225,7 +233,7 @@ def main():
             print(f"📖 Загружено из {OUTPUT_FILE}: {len(existing)}")
         except Exception as e:
             print(f"⚠️ Ошибка чтения {OUTPUT_FILE}: {e}", file=sys.stderr)
-
+            
     # 2. свежие
     downloaded = []
     for url in URLS:
@@ -233,7 +241,7 @@ def main():
         fetched = fetch_url(url)
         print(f"   Найдено {len(fetched)} конфигов")
         downloaded.extend(fetched)
-
+        
     # 3. новые наверх, старые вниз, дедуп
     combined, seen, seen_servers = [], set(), set()
     for cfg in downloaded + existing:
@@ -248,9 +256,9 @@ def main():
                     continue
                 seen_servers.add(key)
         combined.append(cfg)
-
+        
     print(f"\n📊 Всего уникальных конфигов: {len(combined)}")
-
+    
     # 4. проверка живости
     if CHECK_ENABLED:
         print(f"🔍 Проверяем доступность ({MAX_WORKERS} потоков)...")
@@ -266,11 +274,11 @@ def main():
                     f.write(f"# {reason}\n{cfg}\n")
     else:
         working = combined
-
+        
     if not working:
         print("⛔ Рабочих конфигов нет — файл не трогаем, чтобы не сломать подписку.")
         sys.exit(1)
-
+        
     # 5. обрезка и запись
     final = working[:MAX_CONFIGS]
     print(f"✂️ Оставлено (лимит {MAX_CONFIGS}): {len(final)}")
@@ -278,7 +286,6 @@ def main():
         for cfg in final:
             f.write(cfg + "\n")
     print(f"✅ Сохранено в {OUTPUT_FILE}")
-
 
 if __name__ == "__main__":
     main()
