@@ -44,6 +44,8 @@ DEAD_FILE = "dead.txt"        # куда сложить отбракованны
 CHECK_ENABLED = True          # включить проверку живости
 MAX_LATENCY_MS = 6000         # отбрасывать слишком медленные (время реального запроса через туннель)
 SORT_BY_LATENCY = True        # быстрые конфиги наверх (внутри страны); время меряется С РАННЕРА GitHub
+RENAME_CONFIGS = True         # переименовать в «🇫🇷 Франция #1»; False = оставить исходные названия
+NUMBER_PER_COUNTRY = True     # True: номера идут заново в каждой стране; False: сквозная нумерация
 DEDUP_BY_SERVER = False       # True = не больше одного конфига на host:port
 KEEP_UDP_PROTOCOLS = True     # hysteria2/tuic/wireguard: проверить нечем, оставлять как есть
 FALLBACK_LEGACY_CHECK = True  # то, что Xray не умеет, проверять по TCP+TLS (иначе — выбрасывать)
@@ -227,18 +229,265 @@ def get_name(cfg: str) -> str:
     return ""
 
 
-def name_key(cfg: str):
+# ---------- названия: флаг + страна по-русски + номер ----------
+_COUNTRIES = """
+AD Андорра
+AE ОАЭ
+AF Афганистан
+AL Албания
+AM Армения
+AO Ангола
+AR Аргентина
+AT Австрия
+AU Австралия
+AW Аруба
+AZ Азербайджан
+BA Босния и Герцеговина
+BB Барбадос
+BD Бангладеш
+BE Бельгия
+BG Болгария
+BH Бахрейн
+BM Бермуды
+BN Бруней
+BO Боливия
+BR Бразилия
+BS Багамы
+BT Бутан
+BW Ботсвана
+BY Беларусь
+BZ Белиз
+CA Канада
+CH Швейцария
+CI Кот-д'Ивуар
+CL Чили
+CM Камерун
+CN Китай
+CO Колумбия
+CR Коста-Рика
+CU Куба
+CW Кюрасао
+CY Кипр
+CZ Чехия
+DE Германия
+DK Дания
+DO Доминикана
+DZ Алжир
+EC Эквадор
+EE Эстония
+EG Египет
+ES Испания
+ET Эфиопия
+EU Евросоюз
+FI Финляндия
+FJ Фиджи
+FO Фарерские острова
+FR Франция
+GB Великобритания
+GE Грузия
+GG Гернси
+GH Гана
+GI Гибралтар
+GL Гренландия
+GP Гваделупа
+GR Греция
+GT Гватемала
+GU Гуам
+GY Гайана
+HK Гонконг
+HN Гондурас
+HR Хорватия
+HT Гаити
+HU Венгрия
+ID Индонезия
+IE Ирландия
+IL Израиль
+IM Остров Мэн
+IN Индия
+IQ Ирак
+IR Иран
+IS Исландия
+IT Италия
+JE Джерси
+JM Ямайка
+JO Иордания
+JP Япония
+KE Кения
+KG Киргизия
+KH Камбоджа
+KP Северная Корея
+KR Южная Корея
+KW Кувейт
+KY Каймановы острова
+KZ Казахстан
+LA Лаос
+LB Ливан
+LI Лихтенштейн
+LK Шри-Ланка
+LT Литва
+LU Люксембург
+LV Латвия
+LY Ливия
+MA Марокко
+MC Монако
+MD Молдова
+ME Черногория
+MG Мадагаскар
+MK Северная Македония
+MM Мьянма
+MN Монголия
+MO Макао
+MQ Мартиника
+MT Мальта
+MU Маврикий
+MV Мальдивы
+MX Мексика
+MY Малайзия
+MZ Мозамбик
+NA Намибия
+NC Новая Каледония
+NG Нигерия
+NI Никарагуа
+NL Нидерланды
+NO Норвегия
+NP Непал
+NZ Новая Зеландия
+OM Оман
+PA Панама
+PE Перу
+PF Французская Полинезия
+PG Папуа — Новая Гвинея
+PH Филиппины
+PK Пакистан
+PL Польша
+PR Пуэрто-Рико
+PS Палестина
+PT Португалия
+PY Парагвай
+QA Катар
+RE Реюньон
+RO Румыния
+RS Сербия
+RU Россия
+RW Руанда
+SA Саудовская Аравия
+SC Сейшелы
+SD Судан
+SE Швеция
+SG Сингапур
+SI Словения
+SK Словакия
+SM Сан-Марино
+SN Сенегал
+SO Сомали
+SR Суринам
+SV Сальвадор
+SY Сирия
+TH Таиланд
+TJ Таджикистан
+TM Туркменистан
+TN Тунис
+TR Турция
+TT Тринидад и Тобаго
+TW Тайвань
+TZ Танзания
+UA Украина
+UG Уганда
+US США
+UY Уругвай
+UZ Узбекистан
+VA Ватикан
+VE Венесуэла
+VG Британские Виргинские острова
+VN Вьетнам
+XK Косово
+YE Йемен
+ZA ЮАР
+ZM Замбия
+ZW Зимбабве
+"""
+COUNTRIES_RU = dict(line.split(" ", 1) for line in _COUNTRIES.strip().splitlines())
+
+# если флага в названии нет, но страна написана словами
+_EN_FALLBACK = [
+    (r"\b(usa|united states|america)\b", "US"), (r"\b(united kingdom|britain|england)\b", "GB"),
+    (r"\bgermany\b", "DE"), (r"\bfrance\b", "FR"), (r"\bnetherlands?\b", "NL"), (r"\bfinland\b", "FI"),
+    (r"\bsweden\b", "SE"), (r"\bnorway\b", "NO"), (r"\bdenmark\b", "DK"), (r"\bpoland\b", "PL"),
+    (r"\bestonia\b", "EE"), (r"\blatvia\b", "LV"), (r"\blithuania\b", "LT"), (r"\bkazakhstan\b", "KZ"),
+    (r"\bturkey\b|\bturkiye\b", "TR"), (r"\bswitzerland\b", "CH"), (r"\baustria\b", "AT"),
+    (r"\bitaly\b", "IT"), (r"\bspain\b", "ES"), (r"\bjapan\b", "JP"), (r"\bsingapore\b", "SG"),
+    (r"\bhong ?kong\b", "HK"), (r"\bcanada\b", "CA"), (r"\bukraine\b", "UA"), (r"\barmenia\b", "AM"),
+    (r"\bisrael\b", "IL"), (r"\bindia\b", "IN"), (r"\bromania\b", "RO"), (r"\bbulgaria\b", "BG"),
+    (r"\bczech", "CZ"), (r"\bbelarus\b", "BY"), (r"\bgeorgia\b", "GE"), (r"\buae\b|\bemirates\b", "AE"),
+    (r"\brussia\b|росси", "RU"),
+]
+_FLAG_RE = re.compile("[\U0001F1E6-\U0001F1FF]{2}")
+
+
+def flag_to_code(flag: str) -> str:
+    return "".join(chr(ord(c) - 0x1F1E6 + 65) for c in flag)
+
+
+def code_to_flag(code: str) -> str:
+    return "".join(chr(0x1F1E6 + ord(c) - 65) for c in code)
+
+
+def classify(cfg: str):
+    """(группа, ключ сортировки, базовое название).
+    Группы: 0 — страны (по алфавиту), 1 — Anycast, 2 — неизвестно, 3 — Россия (в самом конце)."""
     name = get_name(cfg)
     low = name.lower()
-    # Россия — в самый конец
-    if "🇷🇺" in name or "russia" in low or "росси" in low:
-        return (2, "")
-    # остальные страны — по алфавиту кода флага
-    flags = re.findall("[\U0001F1E6-\U0001F1FF]{2}", name)
-    if flags:
-        return (0, flags[0])
-    # без флага (Unknown и т.п.) — между странами и Россией
-    return (1, low)
+    codes = []
+    for fl in _FLAG_RE.findall(name):
+        c = flag_to_code(fl)
+        if c in COUNTRIES_RU and c not in codes:
+            codes.append(c)
+    if "anycast" in low or "any-cast" in low:
+        label = "🌐 Anycast" + "".join(" " + code_to_flag(c) for c in codes)
+        return 1, label, label
+    if not codes:
+        for pattern, c in _EN_FALLBACK:
+            if re.search(pattern, low):
+                codes = [c]
+                break
+    if not codes:
+        return 2, "", "🌐 Неизвестно"
+    code = codes[0]
+    label = f"{code_to_flag(code)} {COUNTRIES_RU[code]}"
+    if code == "RU":
+        return 3, "", label
+    return 0, COUNTRIES_RU[code], label
+
+
+def set_name(cfg: str, name: str) -> str:
+    """Подставляет новое название в ссылку любого типа."""
+    if cfg.lower().startswith("vmess://"):
+        try:
+            raw = cfg.split("://", 1)[1].split("#", 1)[0]
+            j = json.loads(b64decode(raw).decode("utf-8", errors="ignore"))
+            j["ps"] = name
+            packed = json.dumps(j, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            return "vmess://" + base64.b64encode(packed).decode()
+        except Exception:
+            return cfg
+    # '#' внутри названия обязательно кодируется (%23), иначе ссылка ломается
+    return cfg.split("#", 1)[0] + "#" + urllib.parse.quote(name, safe="")
+
+
+def arrange_and_rename(chosen: list) -> list:
+    """chosen: [(задержка, порядок, ссылка)] -> готовые ссылки: отсортированы по странам, названия по шаблону."""
+    rows = []
+    for lat, order, cfg in chosen:
+        group, sort_name, label = classify(cfg)
+        tie = lat if SORT_BY_LATENCY else 0
+        rows.append(((group, sort_name, tie, order), label, cfg))
+    rows.sort(key=lambda r: r[0])
+    counters, out = Counter(), []
+    for _, label, cfg in rows:
+        counters[label if NUMBER_PER_COUNTRY else ""] += 1
+        n = counters[label if NUMBER_PER_COUNTRY else ""]
+        out.append(set_name(cfg, f"{label} #{n}") if RENAME_CONFIGS else cfg)
+    return out
 
 
 # ---------- конвертер ссылка -> outbound Xray ----------
@@ -958,6 +1207,14 @@ def write_atomic(path: str, text: str):
 
 
 def link_key(cfg: str) -> str:
+    """Ключ для поиска дублей: ссылка без названия (у vmess название внутри base64-json)."""
+    if cfg.lower().startswith("vmess://"):
+        try:
+            j = json.loads(b64decode(cfg.split("://", 1)[1].split("#", 1)[0]).decode("utf-8", errors="ignore"))
+            j.pop("ps", None)
+            return "vmess://" + json.dumps(j, sort_keys=True, ensure_ascii=False)
+        except Exception:
+            pass
     return cfg.split("#", 1)[0]
 
 
@@ -1137,11 +1394,7 @@ def main():
     alive.sort(key=lambda x: x[0])
     udp_entries = [(float("inf"), idx, cfg) for idx, cfg in udp_items]
     chosen = (alive + udp_entries)[:MAX_CONFIGS]
-    if SORT_BY_LATENCY:
-        chosen.sort(key=lambda x: (name_key(x[2]), x[0], x[1]))
-    else:
-        chosen.sort(key=lambda x: (name_key(x[2]), x[1]))
-    final = [c for _, _, c in chosen]
+    final = arrange_and_rename(chosen)
     log(f"✂️ Оставлено (лимит {MAX_CONFIGS}): {len(final)}")
     write_atomic(OUTPUT_FILE, "".join(c + "\n" for c in final))
     log(f"✅ Сохранено в {OUTPUT_FILE}")
