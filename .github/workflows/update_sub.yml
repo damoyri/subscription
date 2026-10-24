@@ -6,7 +6,7 @@ on:
 jobs:
   update-subscription:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     permissions:
       contents: write
     concurrency:
@@ -24,7 +24,38 @@ jobs:
         with:
           python-version: '3.x'
 
+      # Ядро нужно для реальной проверки конфигов. Если не скачалось — шаг не валит джобу,
+      # скрипт сам увидит, что ядра нет, и оставит подписку как есть.
+      - name: Установка Xray-core
+        continue-on-error: true
+        env:
+          XRAY_VERSION: v26.7.28
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/xray"
+          mkdir -p "$dir"
+          base="https://github.com/XTLS/Xray-core/releases"
+          get() {
+            curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --max-time 120 \
+              -o "$RUNNER_TEMP/xray.zip" "$1"
+          }
+          if ! get "$base/download/$XRAY_VERSION/Xray-linux-64.zip"; then
+            echo "::warning::Xray $XRAY_VERSION не скачался, пробую latest"
+            get "$base/latest/download/Xray-linux-64.zip"
+          fi
+          python3 -m zipfile -e "$RUNNER_TEMP/xray.zip" "$dir"
+          chmod +x "$dir/xray"
+          "$dir/xray" version | head -n 1
+          echo "XRAY_PATH=$dir/xray" >> "$GITHUB_ENV"
+
       - name: Запуск воркера обновления
+        # скрипт сам обрабатывает сбои и возвращает 0; continue-on-error — страховка на случай,
+        # если он всё же упадёт: подписка в таком случае не изменится, остальные шаги выполнятся
+        continue-on-error: true
+        timeout-minutes: 22
+        env:
+          PYTHONUNBUFFERED: '1'
+          TIME_BUDGET_SEC: '960'   # лимит на саму проверку, сек
         run: python update_raw_sub.py
 
       - name: Загрузка отчёта по мёртвым конфигам
@@ -47,23 +78,33 @@ jobs:
           fi
           git commit -m "auto: обновление рабочих конфигов в subscription.json"
 
+          cp subscription.json "$RUNNER_TEMP/subscription.json"
           for i in 1 2 3 4 5; do
             if git push origin main; then
               echo "Запушено"
               break
             fi
-            echo "Пуш отклонён (гонка с другим запуском), пробуем снова ($i/5)..."
-            git fetch origin main
-            # Наш subscription.json всегда свежесгенерирован — при конфликте просто берём его версию,
-            # построчный мерж автогенерируемого файла не имеет смысла.
-            git rebase -X ours origin/main
             if [ "$i" -eq 5 ]; then
-              echo "Не удалось запушить после 5 попыток"
+              echo "::error::Не удалось запушить после 5 попыток"
               exit 1
             fi
+            echo "Пуш отклонён (кто-то запушил раньше), пробуем снова ($i/5)..."
+            git fetch origin main
+            # Наш subscription.json всегда свежесгенерирован: берём чужую историю целиком
+            # и поверх кладём наш файл (без rebase, где «ours/theirs» перевёрнуты и легко промахнуться).
+            git reset --hard origin/main
+            cp "$RUNNER_TEMP/subscription.json" subscription.json
+            git add subscription.json
+            if git diff --staged --quiet; then
+              echo "В origin уже такая же версия файла."
+              break
+            fi
+            git commit -m "auto: обновление рабочих конфигов в subscription.json"
           done
 
       - name: Push to Bitbucket (SSH)
+        # зеркало вторично — его сбой не должен делать красной всю джобу
+        continue-on-error: true
         env:
           BITBUCKET_SSH_PRIVATE_KEY: ${{ secrets.BITBUCKET_SSH_PRIVATE_KEY }}
         run: |
@@ -73,7 +114,8 @@ jobs:
           fi
 
           mkdir -p ~/.ssh
-          echo "$BITBUCKET_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          # printf с переводом строки в конце: ключ без финального \n ssh отвергает как «invalid format»
+          printf '%s\n' "$BITBUCKET_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
 
