@@ -47,7 +47,8 @@ SORT_BY_LATENCY = True        # быстрые конфиги наверх (вн
 RENAME_CONFIGS = True         # переименовать в «🇫🇷 Франция #1»; False = оставить исходные названия
 NUMBER_PER_COUNTRY = True     # True: номера идут заново в каждой стране; False: сквозная нумерация
 DEDUP_BY_SERVER = False       # True = не больше одного конфига на host:port
-KEEP_UDP_PROTOCOLS = True     # hysteria2/tuic/wireguard: проверить нечем, оставлять как есть
+CHECK_HYSTERIA2 = True        # hysteria2/hy2 проверять реальным трафиком (через QUIC) — как и остальные
+KEEP_UDP_PROTOCOLS = True     # то, что проверить нечем (tuic, wireguard, hysteria2 с insecure=1): оставлять как есть
 FALLBACK_LEGACY_CHECK = True  # то, что Xray не умеет, проверять по TCP+TLS (иначе — выбрасывать)
 
 # --- реальная проверка через Xray ---
@@ -89,6 +90,7 @@ URLS = [
     "https://etoneya.su/whitelist"
 ]
 UDP_SCHEMES = {"hysteria", "hysteria2", "hy2", "tuic", "wireguard", "warp"}
+XRAY_UDP_SCHEMES = {"hysteria2", "hy2"}   # из UDP-протоколов реально проверить Xray умеет только эти
 SS_METHODS = {
     "aes-128-gcm", "aes-256-gcm", "chacha20-poly1305", "chacha20-ietf-poly1305",
     "xchacha20-poly1305", "xchacha20-ietf-poly1305", "none", "plain",
@@ -723,8 +725,91 @@ def _ss(line: str) -> dict:
     }
 
 
+def _hysteria2(line: str) -> dict:
+    """hysteria2://auth@host:port[,порты]?sni=..&pinSHA256=..&obfs=salamander&obfs-password=..&fm={..}#имя"""
+    body = line.split("://", 1)[1].split("#", 1)[0]
+    main_part, _, query = body.partition("?")
+    main_part = main_part.rstrip("/")
+    if "@" not in main_part:
+        raise Invalid("hysteria2: нет пароля")
+    userinfo, _, hostport = main_part.rpartition("@")
+    auth = urllib.parse.unquote(userinfo)
+    if not auth:
+        raise Invalid("hysteria2: пустой пароль")
+    if hostport.startswith("["):
+        host, _, rest = hostport[1:].partition("]")
+        ports = rest[1:] if rest.startswith(":") else ""
+    elif ":" in hostport:
+        host, _, ports = hostport.rpartition(":")
+    else:
+        host, ports = hostport, ""
+    check_host(host)
+    # «443,5000-6000» — port hopping: для проверки достаточно первого порта
+    first = re.split(r"[,-]", ports)[0] if ports else "443"
+    try:
+        port = check_port(int(first))
+    except ValueError:
+        raise Invalid("порт")
+
+    p = flat_params(query)
+    truthy = lambda v: str(v).lower() in ("1", "true", "yes")  # noqa: E731
+    pin = (p.get("pinsha256") or "").replace(":", "").replace(" ", "").lower()
+    if pin and not re.fullmatch(r"[0-9a-f]{64}", pin):
+        raise Unsupported("pinSHA256 в неизвестном формате")
+    if (truthy(p.get("insecure", "")) or truthy(p.get("allowinsecure", ""))) and not pin:
+        raise Unsupported("insecure=1 без pinSHA256 (Xray убрал allowInsecure)")
+
+    tls = {"alpn": [a for a in (p.get("alpn") or "h3").split(",") if a]}
+    sni = p.get("sni") or p.get("peer") or ""
+    if not sni:
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            sni = host
+    if sni:
+        tls["serverName"] = sni
+    if pin:
+        tls["pinnedPeerCertSha256"] = pin
+
+    # обфускация salamander: либо obfs=/obfs-password=, либо JSON в fm= (формат Xray)
+    masks = []
+    obfs = (p.get("obfs") or "").lower()
+    if obfs:
+        if obfs != "salamander" or not p.get("obfs-password"):
+            raise Unsupported(f"obfs={obfs}")
+        masks.append({"type": "salamander", "settings": {"password": p["obfs-password"]}})
+    if p.get("fm"):
+        try:
+            fm = json.loads(p["fm"])
+        except Exception:
+            raise Unsupported("fm не JSON")
+        if fm:
+            udp = fm.get("udp") if isinstance(fm, dict) else None
+            if not isinstance(udp, list) or set(fm) - {"udp"}:
+                raise Unsupported("fm: неизвестная структура")
+            for mask in udp:
+                pw = (mask.get("settings") or {}).get("password") if isinstance(mask, dict) else None
+                if not (isinstance(mask, dict) and mask.get("type") == "salamander" and pw):
+                    raise Unsupported("fm: неизвестная маска")
+                item = {"type": "salamander", "settings": {"password": pw}}
+                if item not in masks:
+                    masks.append(item)
+
+    stream = {"network": "hysteria", "security": "tls", "tlsSettings": tls,
+              "hysteriaSettings": {"version": 2, "auth": auth}}
+    if masks:
+        stream["finalmask"] = {"udp": masks}
+    return {
+        "protocol": "hysteria",
+        "settings": {"version": 2, "address": host, "port": port},
+        "streamSettings": stream,
+    }
+
+
 def to_outbound(line: str) -> dict:
     scheme = line.split("://", 1)[0].lower()
+    if scheme in XRAY_UDP_SCHEMES:
+        return _hysteria2(line)
     if scheme == "vmess":
         return _vmess(line.split("://", 1)[1])
     if scheme in ("vless", "trojan"):
@@ -1305,28 +1390,36 @@ def main():
     deadline = t_start + TIME_BUDGET_SEC
     t0 = time.perf_counter()
 
+    def keep_unchecked_udp(idx, cfg, why):
+        if KEEP_UDP_PROTOCOLS:
+            udp_items.append((idx, cfg))
+        else:
+            dead.append((cfg, f"udp-протокол, проверка невозможна: {why}"))
+
     xray_items, legacy_items, udp_items, dead = [], [], [], []
     for idx, cfg in enumerate(combined):
         scheme = cfg.split("://", 1)[0].lower()
-        if scheme in UDP_SCHEMES:
-            if KEEP_UDP_PROTOCOLS:
-                udp_items.append((idx, cfg))
-            else:
-                dead.append((cfg, "udp-протокол, проверка невозможна"))
+        is_udp = scheme in UDP_SCHEMES
+        if is_udp and not (CHECK_HYSTERIA2 and scheme in XRAY_UDP_SCHEMES):
+            keep_unchecked_udp(idx, cfg, scheme)
             continue
         try:
             xray_items.append((idx, cfg, to_outbound(cfg)))
         except Invalid as e:
             dead.append((cfg, f"невалидный: {e}"))
         except Unsupported as e:
-            if FALLBACK_LEGACY_CHECK and parse_config(cfg):
+            if is_udp:
+                keep_unchecked_udp(idx, cfg, str(e))
+            elif FALLBACK_LEGACY_CHECK and parse_config(cfg):
                 legacy_items.append((idx, cfg))
             else:
                 dead.append((cfg, f"не проверить: {e}"))
         except Exception as e:
             dead.append((cfg, f"ошибка разбора: {type(e).__name__}"))
-    log(f"🗂 К реальной проверке: {len(xray_items)} | по TCP+TLS: {len(legacy_items)} | "
-        f"UDP (без проверки): {len(udp_items)} | сразу отброшено: {len(dead)}")
+    hy_items = [it for it in xray_items if it[1].split("://", 1)[0].lower() in XRAY_UDP_SCHEMES]
+    log(f"🗂 К реальной проверке: {len(xray_items)} (из них hysteria2: {len(hy_items)}) | "
+        f"по TCP+TLS: {len(legacy_items)} | UDP (без проверки): {len(udp_items)} | "
+        f"сразу отброшено: {len(dead)}")
 
     alive = []   # (latency, order, cfg)
     rejected = 0
@@ -1341,6 +1434,19 @@ def main():
                 if r[2].startswith("ядро отвергло"):
                     rejected += 1
     real_alive = len(alive)
+
+    # Страховка: если не прошёл НИ ОДИН hysteria2, скорее всего UDP с раннера не ходит (или сменился формат),
+    # а не все эти серверы мертвы. Тогда не выбрасываем их, а оставляем без проверки.
+    if hy_items:
+        hy_cfgs = {it[1] for it in hy_items}
+        hy_alive = sum(1 for a in alive if a[2] in hy_cfgs)
+        log(f"🛰 hysteria2: проверено {len(hy_items)}, рабочих {hy_alive}")
+        if len(hy_items) >= 5 and hy_alive == 0:
+            warn(f"Ни один из {len(hy_items)} hysteria2 не прошёл проверку — похоже, UDP с раннера недоступен. "
+                 "Оставляю их без проверки")
+            dead = [(c, r) for c, r in dead if c not in hy_cfgs]
+            for idx, cfg, _ in hy_items:
+                keep_unchecked_udp(idx, cfg, "hysteria2: проверка не сработала ни у одного")
 
     if legacy_items:
         log(f"🔍 Запасная проверка TCP+TLS: {len(legacy_items)} конфигов")
