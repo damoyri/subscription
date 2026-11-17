@@ -11,9 +11,15 @@
 Что не умеет проверить Xray (hysteria2/tuic/wireguard, allowInsecure, плагины ss и т.п.):
   UDP-протоколы остаются как есть, остальное проходит старую проверку TCP + TLS.
 
+Платная подписка (секрет PAID_SUB_URL):
+  скачивается как есть, НЕ проверяется, НЕ переименовывается, всегда в самом начале.
+  Открытые источники (URLS в коде + секрет PAID_SUB_URL_2) проверяются как обычно.
+  Дубли убираются везде: платный > свежий открытый > старый из файла.
+
 Защита от поломок:
   - нет ядра / ядро не стартует / у раннера нет интернета -> подписку НЕ трогаем, выходим с кодом 0;
   - рабочих меньше MIN_WORKING или ядро массово отвергает конфиги -> подписку не трогаем;
+  - платные ссылки заданы, но ничего не скачалось -> подписку не трогаем;
   - общий лимит времени TIME_BUDGET_SEC, все процессы ядра гарантированно убиваются.
 """
 import atexit
@@ -38,7 +44,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ================= НАСТРОЙКИ =================
-MAX_CONFIGS = 1000            # сколько конфигов оставить в итоге
+MAX_CONFIGS = 1000            # сколько конфигов оставить в итоге (платные всегда целиком + открытые на остаток)
 OUTPUT_FILE = "subscription.json"
 DEAD_FILE = "dead.txt"        # куда сложить отбракованные (для отладки), "" — не писать
 CHECK_ENABLED = True          # включить проверку живости
@@ -90,6 +96,13 @@ URLS = [
     "https://etoneya.su/whitelist",
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-CIDR-RU-all.txt"
 ]
+
+# --- платная подписка: без проверки, без переименования, всегда в самом начале ---
+PAID_ENV_VARS = ("PAID_SUB_URL",)     # секрет 1: платные подписки (можно несколько ссылок с новой строки)
+OPEN_ENV_VARS = ("PAID_SUB_URL_2",)   # секрет 2: открытые источники (добавляются к URLS, проверяются как обычно)
+PAID_REQUIRED = True   # платные ссылки заданы, но ничего не скачалось -> подписку не трогаем
+PAID_DEDUP = True      # убирать одинаковые конфиги между платными источниками (wl пересекается с полной)
+
 UDP_SCHEMES = {"hysteria", "hysteria2", "hy2", "tuic", "wireguard", "warp"}
 XRAY_UDP_SCHEMES = {"hysteria2", "hy2"}   # из UDP-протоколов реально проверить Xray умеет только эти
 SS_METHODS = {
@@ -128,7 +141,8 @@ def is_valid_config(line: str) -> bool:
     return "://" in line
 
 
-def fetch_url(url: str) -> list:
+def fetch_url(url: str, label: str = "") -> list:
+    shown = label or url
     content = None
     for attempt in range(1, 4):
         try:
@@ -139,7 +153,7 @@ def fetch_url(url: str) -> list:
                 content = response.read(30_000_000).decode("utf-8", errors="ignore")
             break
         except Exception as e:
-            print(f"⚠️ Ошибка при скачивании {url} (попытка {attempt}/3): {e}", file=sys.stderr, flush=True)
+            print(f"⚠️ Ошибка при скачивании {shown} (попытка {attempt}/3): {e}", file=sys.stderr, flush=True)
             time.sleep(2 * attempt)
     if content is None:
         return []
@@ -1293,7 +1307,8 @@ def write_atomic(path: str, text: str):
 
 
 def link_key(cfg: str) -> str:
-    """Ключ для поиска дублей: ссылка без названия (у vmess название внутри base64-json)."""
+    """Ключ для поиска дублей: ссылка без названия и без зависимости от порядка query-параметров
+    (у vmess название внутри base64-json). Сама ссылка при этом НЕ меняется — ключ только для сравнения."""
     if cfg.lower().startswith("vmess://"):
         try:
             j = json.loads(b64decode(cfg.split("://", 1)[1].split("#", 1)[0]).decode("utf-8", errors="ignore"))
@@ -1301,7 +1316,52 @@ def link_key(cfg: str) -> str:
             return "vmess://" + json.dumps(j, sort_keys=True, ensure_ascii=False)
         except Exception:
             pass
-    return cfg.split("#", 1)[0]
+    base = cfg.split("#", 1)[0]
+    try:
+        u = urllib.parse.urlsplit(base)
+        if u.query:
+            q = sorted(urllib.parse.parse_qsl(u.query, keep_blank_values=True))
+            base = urllib.parse.urlunsplit((u.scheme, u.netloc, u.path, urllib.parse.urlencode(q), ""))
+    except Exception:
+        pass
+    return base
+
+
+# ---------- платная подписка (как есть, без проверки, в начало) ----------
+def urls_from_env(var_names) -> list:
+    """[(имя_переменной, ссылка)] из env. В одной переменной может быть несколько ссылок —
+    с новой строки, через пробел, запятую или точку с запятой. Дубли ссылок убираются."""
+    out, seen = [], set()
+    for var in var_names:
+        for u in re.split(r"[\s,;]+", (os.environ.get(var) or "").strip()):
+            if u.startswith(("http://", "https://")) and u not in seen:
+                seen.add(u)
+                out.append((var, u))
+    return out
+
+
+def fetch_paid() -> list:
+    """Скачивает платные подписки и возвращает ссылки КАК ЕСТЬ (имена не трогаем).
+    Сами URL в лог не печатаем — в них токен."""
+    sources = urls_from_env(PAID_ENV_VARS)
+    if not sources:
+        log("💎 Платные источники не заданы (секрет PAID_SUB_URL пуст)")
+        return []
+    out, seen = [], set()
+    for n, (var, url) in enumerate(sources, 1):
+        label = f"{var} (ссылка {n})"
+        log(f"💎 Скачиваем платный источник: {label}")
+        fetched = fetch_url(url, label=label)
+        log(f"   Найдено {len(fetched)} конфигов")
+        for cfg in fetched:
+            if PAID_DEDUP:
+                k = link_key(cfg)
+                if k in seen:
+                    continue
+                seen.add(k)
+            out.append(cfg)
+    log(f"💎 Платных всего: {len(out)} — пойдут в начало подписки без проверки")
+    return out
 
 
 def main():
@@ -1331,9 +1391,20 @@ def main():
         except Exception as e:
             print(f"⚠️ Ошибка чтения {OUTPUT_FILE}: {e}", file=sys.stderr)
 
-    # 2. свежие
+    # 1.5 платная подписка: как есть, без проверки и переименования, всегда в начало
+    paid = fetch_paid()
+    if PAID_REQUIRED and urls_from_env(PAID_ENV_VARS) and not paid:
+        warn("Платные источники заданы, но ни один не отдал конфиги — подписку не трогаем")
+        return 0
+    paid_keys = {link_key(c) for c in paid}
+
+    # 2. свежие открытые: ссылки из кода + из секрета PAID_SUB_URL_2, без дублей источников
+    open_urls = []
+    for u in list(URLS) + [u for _, u in urls_from_env(OPEN_ENV_VARS)]:
+        if u not in open_urls:
+            open_urls.append(u)
     downloaded = []
-    for url in URLS:
+    for url in open_urls:
         log(f"📥 Скачиваем: {url}")
         fetched = fetch_url(url)
         log(f"   Найдено {len(fetched)} конфигов")
@@ -1341,8 +1412,9 @@ def main():
     if not downloaded:
         warn("Ни один источник не отдал конфиги — проверяем только то, что уже в подписке")
 
-    # 3. новые наверх, старые вниз, дедуп (ссылки, отличающиеся только именем, — один конфиг)
-    combined, seen, seen_servers = [], set(), set()
+    # 3. новые наверх, старые вниз, дедуп везде.
+    # Ключи платных уже в seen -> любой открытый/старый дубль платного конфига удаляется.
+    combined, seen, seen_servers = [], set(paid_keys), set()
     for cfg in downloaded + existing:
         k = link_key(cfg)
         if k in seen:
@@ -1367,9 +1439,10 @@ def main():
 
     # 4. проверка
     if not CHECK_ENABLED:
-        final = combined[:MAX_CONFIGS]
+        public = combined[:max(0, MAX_CONFIGS - len(paid))]
+        final = paid + public
         write_atomic(OUTPUT_FILE, "".join(c + "\n" for c in final))
-        log(f"✅ Проверка выключена, сохранено {len(final)} в {OUTPUT_FILE}")
+        log(f"✅ Проверка выключена, сохранено {len(final)} в {OUTPUT_FILE} (платных: {len(paid)})")
         return 0
 
     core = find_core()
@@ -1478,6 +1551,7 @@ def main():
             warn(f"Не удалось записать {DEAD_FILE}: {e}")
 
     summary = ["### Проверка подписки", "",
+               f"- Платных (в начале, без проверки): **{len(paid)}**",
                f"- Рабочих (реальный трафик): **{real_alive}**",
                f"- По TCP+TLS: {len(alive) - real_alive}",
                f"- UDP без проверки: {len(udp_items)}",
@@ -1497,12 +1571,13 @@ def main():
              "Подписку не трогаем")
         return 0
 
-    # 6. обрезка по качеству, затем красивая сортировка
+    # 6. платные в начало как есть, открытые — по качеству + красивая сортировка
     alive.sort(key=lambda x: x[0])
     udp_entries = [(float("inf"), idx, cfg) for idx, cfg in udp_items]
-    chosen = (alive + udp_entries)[:MAX_CONFIGS]
-    final = arrange_and_rename(chosen)
-    log(f"✂️ Оставлено (лимит {MAX_CONFIGS}): {len(final)}")
+    public_limit = max(0, MAX_CONFIGS - len(paid))
+    chosen = (alive + udp_entries)[:public_limit]
+    final = paid + arrange_and_rename(chosen)
+    log(f"✂️ Платных в начало: {len(paid)} | открытых оставлено: {len(chosen)} (общий лимит {MAX_CONFIGS})")
     write_atomic(OUTPUT_FILE, "".join(c + "\n" for c in final))
     log(f"✅ Сохранено в {OUTPUT_FILE}")
     return 0
