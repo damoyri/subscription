@@ -56,6 +56,8 @@ jobs:
         env:
           PYTHONUNBUFFERED: '1'
           TIME_BUDGET_SEC: '960'   # лимит на саму проверку, сек
+          PAID_SUB_URL: ${{ secrets.PAID_SUB_URL }}      # секрет 1: платные (без проверки, в начало)
+          PAID_SUB_URL_2: ${{ secrets.PAID_SUB_URL_2 }}  # секрет 2: открытые источники
         run: python update_raw_sub.py
 
       - name: Загрузка отчёта по мёртвым конфигам
